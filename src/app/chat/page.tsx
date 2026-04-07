@@ -18,7 +18,7 @@ import {
 import { askFinancialQuestion } from '@/app/lib/actions';
 import { cn } from '@/lib/utils';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, getDocs, query, limit } from 'firebase/firestore';
+import { collection, getDocs, query, limit, orderBy } from 'firebase/firestore';
 
 function ChatContent() {
   const searchParams = useSearchParams();
@@ -70,8 +70,13 @@ function ChatContent() {
       const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
       const relevantChunks: any[] = [];
       
+      // Limit context to prevent hitting context length or token rate limits
       for (const docSnap of docsSnapshot.docs) {
-        const chunksSnapshot = await getDocs(query(collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'), limit(20)));
+        const chunksSnapshot = await getDocs(query(
+          collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'), 
+          orderBy('transactionDate', 'desc'),
+          limit(30)
+        ));
         chunksSnapshot.forEach(chunk => {
           const data = chunk.data();
           relevantChunks.push({
@@ -96,7 +101,7 @@ function ChatContent() {
       console.error(error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: "I'm sorry, I encountered an error while analyzing your data. Please ensure you've uploaded some documents first." 
+        content: "I'm sorry, I encountered an error while analyzing your data. This might be due to API rate limits. Please try again in a few seconds." 
       }]);
     } finally {
       setIsLoading(false);
@@ -187,7 +192,7 @@ function ChatContent() {
           </Button>
         </div>
         <p className="text-[10px] text-center mt-3 text-muted-foreground">
-          FinChat AI utilizes your private data context. Analysis is based solely on your documents.
+          FinChat AI utilizes your private data context. Analysis is based solely on your records.
         </p>
       </div>
     </div>

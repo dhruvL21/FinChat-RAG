@@ -36,6 +36,20 @@ const CategorizeExpenseOutputSchema = z.object({
 });
 export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
 
+// Internal retry helper to handle 429/RESOURCE_EXHAUSTED errors
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const errorMsg = String(error);
+    if ((errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED')) && retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
 const prompt = ai.definePrompt({
   name: 'categorizeExpensePrompt',
   input: { schema: CategorizeExpenseInputSchema },
@@ -59,7 +73,7 @@ const categorizeExpensesFlow = ai.defineFlow(
     outputSchema: CategorizeExpenseOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
+    const { output } = await withRetry(() => prompt(input));
     return output!;
   }
 );
