@@ -3,8 +3,6 @@
  * @fileOverview A Genkit flow to categorize financial expenses based on transaction descriptions in batches.
  *
  * - categorizeExpenses - A function that handles the batch expense categorization process.
- * - CategorizeExpenseInput - The input type for the categorizeExpenses function.
- * - CategorizeExpenseOutput - The return type for the categorizeExpenses function.
  */
 
 import { ai } from '@/ai/genkit';
