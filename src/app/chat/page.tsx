@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
@@ -9,13 +10,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { 
   Send, 
   Bot, 
-  User, 
+  User as UserIcon, 
   Loader2, 
   PlusCircle,
   MessageSquare
 } from 'lucide-react';
 import { askFinancialQuestion } from '@/app/lib/actions';
 import { cn } from '@/lib/utils';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, getDocs, query, limit } from 'firebase/firestore';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -33,6 +36,8 @@ export default function ChatPage() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
+  const db = useFirestore();
 
   useEffect(() => {
     setMounted(true);
@@ -45,7 +50,7 @@ export default function ChatPage() {
   }, [messages, isLoading]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !user || !db) return;
 
     const userMsg = input.trim();
     setInput('');
@@ -53,12 +58,36 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const response = await askFinancialQuestion(userMsg);
+      // 1. Retrieve context from Firestore (Simulated Vector Search)
+      // For MVP: Fetch all chunks for this user and pass to LLM
+      const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
+      const relevantChunks: any[] = [];
+      
+      for (const docSnap of docsSnapshot.docs) {
+        const chunksSnapshot = await getDocs(query(collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'), limit(20)));
+        chunksSnapshot.forEach(chunk => {
+          const data = chunk.data();
+          relevantChunks.push({
+            text: data.chunkText,
+            metadata: {
+              date: data.transactionDate || 'Unknown',
+              category: data.category,
+              amount: data.amount,
+              fileName: docSnap.data().filename
+            }
+          });
+        });
+      }
+
+      // 2. Call Genkit Flow
+      const response = await askFinancialQuestion(userMsg, relevantChunks);
+      
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: response.answer
       }]);
     } catch (error) {
+      console.error(error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: "I'm sorry, I encountered an error while analyzing your data. Please ensure you've uploaded some documents first." 
@@ -101,7 +130,7 @@ export default function ChatPage() {
                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
                 msg.role === 'user' ? "bg-accent text-accent-foreground" : "bg-primary text-primary-foreground"
               )}>
-                {msg.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                {msg.role === 'user' ? <UserIcon className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
               </div>
               
               <div className={cn(

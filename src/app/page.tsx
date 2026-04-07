@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -10,7 +11,8 @@ import {
   Wallet, 
   CreditCard, 
   Calendar,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -22,10 +24,11 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { getTransactions } from '@/app/lib/actions';
 import type { Transaction } from '@/lib/types';
+import { useFirestore, useUser } from '@/firebase';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
-const data = [
+const chartData = [
   { name: 'Jan', spent: 2400 },
   { name: 'Feb', spent: 1398 },
   { name: 'Mar', spent: 9800 },
@@ -36,14 +39,49 @@ const data = [
 
 export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
-  
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useUser();
+  const db = useFirestore();
+
   useEffect(() => {
     async function load() {
-      const txs = await getTransactions();
-      setRecentTransactions(txs.slice(-5).reverse());
+      if (!user || !db) return;
+      setIsLoading(true);
+      try {
+        const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
+        const txs: Transaction[] = [];
+        
+        for (const docSnap of docsSnapshot.docs) {
+          const chunksSnapshot = await getDocs(query(
+            collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'),
+            orderBy('transactionDate', 'desc'),
+            limit(10)
+          ));
+          
+          chunksSnapshot.forEach(chunk => {
+            const data = chunk.data();
+            if (data.amount !== undefined) {
+              txs.push({
+                id: chunk.id,
+                date: data.transactionDate,
+                description: data.chunkText.split(',')[1] || 'Transaction',
+                amount: data.amount,
+                category: data.category || 'Miscellaneous',
+                sourceFile: docSnap.data().filename
+              });
+            }
+          });
+        }
+        
+        setRecentTransactions(txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10));
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
     }
     load();
-  }, []);
+  }, [user, db]);
 
   return (
     <SidebarProvider>
@@ -92,7 +130,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data}>
+                  <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                     <XAxis 
                       dataKey="name" 
@@ -112,7 +150,7 @@ export default function DashboardPage() {
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     />
                     <Bar dataKey="spent" radius={[4, 4, 0, 0]}>
-                      {data.map((entry, index) => (
+                      {chartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={index === 2 ? 'hsl(var(--accent))' : 'hsl(var(--primary))'} />
                       ))}
                     </Bar>
@@ -129,15 +167,19 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {recentTransactions.length > 0 ? (
+                  {isLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
+                    </div>
+                  ) : recentTransactions.length > 0 ? (
                     recentTransactions.map((tx) => (
                       <div key={tx.id} className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="bg-primary/10 p-2 rounded-full">
                             <CreditCard className="w-4 h-4 text-primary" />
                           </div>
-                          <div>
-                            <p className="text-sm font-medium">{tx.description}</p>
+                          <div className="overflow-hidden">
+                            <p className="text-sm font-medium truncate max-w-[120px]">{tx.description}</p>
                             <p className="text-xs text-muted-foreground">{tx.category} • {tx.date}</p>
                           </div>
                         </div>
