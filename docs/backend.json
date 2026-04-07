@@ -1,0 +1,273 @@
+{
+  "entities": {
+    "Document": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Document",
+      "type": "object",
+      "description": "Represents an uploaded financial document (CSV, PDF) by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Document entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the external User who uploaded this document. (Relationship: User 1:N Document)"
+        },
+        "filename": {
+          "type": "string",
+          "description": "The original name of the uploaded file."
+        },
+        "fileType": {
+          "type": "string",
+          "description": "The type of the file, e.g., 'CSV', 'PDF'."
+        },
+        "uploadDate": {
+          "type": "string",
+          "description": "The date and time when the document was uploaded.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "The processing status of the document, e.g., 'pending', 'processing', 'ready', 'failed', 'deleted'."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "filename",
+        "fileType",
+        "uploadDate",
+        "status"
+      ]
+    },
+    "DocumentChunk": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DocumentChunk",
+      "type": "object",
+      "description": "Represents a segment of text extracted from a Document, along with its metadata and embedding.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the DocumentChunk entity."
+        },
+        "documentId": {
+          "type": "string",
+          "description": "Reference to the Document from which this chunk was extracted. (Relationship: Document 1:N DocumentChunk)"
+        },
+        "chunkText": {
+          "type": "string",
+          "description": "The actual text content of this chunk."
+        },
+        "chunkOrder": {
+          "type": "number",
+          "description": "The sequential order of this chunk within its original document, useful for reassembly or contextual understanding."
+        },
+        "transactionDate": {
+          "type": "string",
+          "description": "The date associated with a financial transaction within this chunk (if applicable), e.g., from a bank statement.",
+          "format": "date"
+        },
+        "category": {
+          "type": "string",
+          "description": "The auto-categorized expense category for financial data in this chunk, e.g., 'Food', 'Rent', 'Travel'."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount associated with a financial transaction in this chunk (if applicable)."
+        },
+        "embeddingVector": {
+          "type": "array",
+          "description": "The vector embedding generated for this chunk's text, used for semantic search.",
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "documentId",
+        "chunkText",
+        "chunkOrder",
+        "embeddingVector"
+      ]
+    },
+    "ChatSession": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatSession",
+      "type": "object",
+      "description": "Represents a conversational session between a user and the AI assistant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ChatSession entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the external User who initiated this chat session. (Relationship: User 1:N ChatSession)"
+        },
+        "title": {
+          "type": "string",
+          "description": "An optional, descriptive title for the chat session, either user-provided or auto-generated."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "The date and time when the chat session was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "The date and time when the chat session was last updated (e.g., a new message was added).",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "createdAt"
+      ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a single message within a ChatSession, sent by either the user or the AI assistant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ChatMessage entity."
+        },
+        "chatSessionId": {
+          "type": "string",
+          "description": "Reference to the ChatSession this message belongs to. (Relationship: ChatSession 1:N ChatMessage)"
+        },
+        "senderType": {
+          "type": "string",
+          "description": "Indicates who sent the message: 'user' or 'assistant'."
+        },
+        "messageContent": {
+          "type": "string",
+          "description": "The actual text content of the message."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "The date and time when the message was sent.",
+          "format": "date-time"
+        },
+        "referencedChunkIds": {
+          "type": "array",
+          "description": "References to DocumentChunk IDs that were used as sources for the AI's answer (if applicable). (Relationship: ChatMessage N:N DocumentChunk)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "chatSessionId",
+        "senderType",
+        "messageContent",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}/documents/{documentId}",
+        "definition": {
+          "entityName": "Document",
+          "schema": {
+            "$ref": "#/backend/entities/Document"
+          },
+          "description": "Stores user-uploaded financial documents (CSV, PDF). The 'userId' in the path ensures ownership-based authorization. Includes denormalized 'userId' field for data integrity and direct server-side checks.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the document."
+            },
+            {
+              "name": "documentId",
+              "description": "The unique identifier of the document."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/documents/{documentId}/chunks/{chunkId}",
+        "definition": {
+          "entityName": "DocumentChunk",
+          "schema": {
+            "$ref": "#/backend/entities/DocumentChunk"
+          },
+          "description": "Stores text segments extracted from a specific user's document. Authorization is inherited from the parent document's path, directly associating chunks with the user who owns the parent document. The 'documentId' field within the chunk links it to its parent document.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent document."
+            },
+            {
+              "name": "documentId",
+              "description": "The unique identifier of the parent document."
+            },
+            {
+              "name": "chunkId",
+              "description": "The unique identifier of the document chunk."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/chatSessions/{chatSessionId}",
+        "definition": {
+          "entityName": "ChatSession",
+          "schema": {
+            "$ref": "#/backend/entities/ChatSession"
+          },
+          "description": "Stores individual chat sessions initiated by a user with the AI assistant. The 'userId' in the path ensures ownership-based authorization. Includes denormalized 'userId' field for data integrity and direct server-side checks.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the chat session."
+            },
+            {
+              "name": "chatSessionId",
+              "description": "The unique identifier of the chat session."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/chatSessions/{chatSessionId}/messages/{messageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores individual messages within a specific user's chat session. Authorization is inherited from the parent chat session's path, directly associating messages with the user who owns the parent session. The 'chatSessionId' field within the message links it to its parent chat session.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user who owns the parent chat session."
+            },
+            {
+              "name": "chatSessionId",
+              "description": "The unique identifier of the parent chat session."
+            },
+            {
+              "name": "messageId",
+              "description": "The unique identifier of the chat message."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The recommended Firestore structure for FinChat AI prioritizes user data isolation, clear ownership, and robust authorization independence by leveraging deeply nested, path-based collections. All core application data — Documents, DocumentChunks, ChatSessions, and ChatMessages — are securely housed within a user-specific hierarchy.\n\n**Authorization Independence:** This is achieved by embedding the `userId` directly into the top-level path segment for all user-owned data: `/users/{userId}/...`. For example, a Document is stored at `/users/{userId}/documents/{documentId}`, and a ChatSession at `/users/{userId}/chatSessions/{chatSessionId}`. This design allows Firestore security rules to directly compare `request.auth.uid` with the `{userId}` wildcard in the path (e.g., `allow read, write: if request.auth.uid == userId;`). This eliminates the need for `get()` operations in security rules to check parent ownership, thus avoiding hierarchical authorization dependencies, making rules atomic, simpler to write, and easier to debug. For subcollections like `DocumentChunk` and `ChatMessage`, while their respective parent IDs (`documentId`, `chatSessionId`) are part of their data, the ultimate authorization relies on the `userId` present in the main path, which fully satisfies Authorization Independence without adding redundant `userId` fields to nested entities purely for rule evaluation.\n\n**QAPs (Rules are not Filters):** The structural segregation by `userId` inherently supports Queryable Access Patterns (QAPs). Since each user's data is isolated under their specific `/users/{userId}` path, any `list` operation on these collections (e.g., `/users/{userId}/documents` or `/users/{userId}/chatSessions/{chatSessionId}/messages`) will automatically be restricted to the authenticated user's data, provided the security rules enforce `request.auth.uid == userId`. This means the database is queried directly for the exact data the user is authorized to see, rather than fetching a broader set of data and relying on rules to filter it client-side. This approach is highly performant and secure, as rules are enforced before data leaves the database. The `Document.userId` and `ChatSession.userId` fields within the documents serve as internal data integrity checks and can be used for server-side validation or index creation, but the primary authorization for reads and writes is handled by the path itself."
+  }
+}

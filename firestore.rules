@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * FINCHAT AI SECURITY RULES
+     *
+     * CORE PHILOSOPHY:
+     * This ruleset enforces a strict Ownership-based authorization model. All application data 
+     * is logically and physically partitioned by a user's unique identifier (UID). 
+     *
+     * DATA STRUCTURE:
+     * All resources follow a hierarchical path-based segregation:
+     * - /users/{userId}/documents/{documentId}
+     * - /users/{userId}/chatSessions/{chatSessionId}
+     *
+     * KEY SECURITY DECISIONS:
+     * 1. Path-Based Authorization: We compare the {userId} wildcard in the document path 
+     *    directly against the authenticated user's UID (request.auth.uid). This is highly 
+     *    performant and avoids expensive get() calls for parent ownership checks.
+     * 2. Relational Integrity: On creation and update, we enforce that internal link 
+     *    fields (like 'userId' or 'documentId') match the current path and are immutable.
+     * 3. Prototyping Flexibility: While authorization is strictly enforced, the specific 
+     *    content of documents is not validated to allow for rapid frontend iteration.
+     * 4. User Isolation: No user can list or read documents belonging to another user.
+     */
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    /** Checks if the request is from an authenticated user. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** Checks if the authenticated user matches the provided userId. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** Checks if the user is the owner and the document exists (for updates/deletes). */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // --- COLLECTION RULES ---
+
+    /**
+     * @description Rules for user-uploaded financial documents.
+     * @path /users/{userId}/documents/{documentId}
+     * @allow (create) User 'abc' creating a document at /users/abc/documents/doc123 where userId field is 'abc'.
+     * @deny (list) User 'xyz' attempting to list documents at /users/abc/documents.
+     * @principle Restricts access to a user's own data tree and validates ownership field integrity.
+     */
+    match /users/{userId}/documents/{documentId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Rules for text segments extracted from documents.
+       * @path /users/{userId}/documents/{documentId}/chunks/{chunkId}
+       * @allow (get) User 'abc' reading a chunk of their own document.
+       * @deny (create) User 'abc' creating a chunk for a document path belonging to user 'xyz'.
+       * @principle Inherits ownership from the parent path and enforces relational consistency with documentId.
+       */
+      match /chunks/{chunkId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.documentId == documentId;
+        allow update: if isExistingOwner(userId) && request.resource.data.documentId == resource.data.documentId;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description Rules for conversational chat sessions.
+     * @path /users/{userId}/chatSessions/{chatSessionId}
+     * @allow (update) User 'abc' updating the 'updatedAt' field of their own session.
+     * @deny (delete) User 'abc' deleting a chat session belonging to user 'xyz'.
+     * @principle Enforces path-based ownership and immutability of the owner link.
+     */
+    match /users/{userId}/chatSessions/{chatSessionId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description Rules for messages within a chat session.
+       * @path /users/{userId}/chatSessions/{chatSessionId}/messages/{messageId}
+       * @allow (list) User 'abc' listing all messages in their active session.
+       * @deny (create) User 'abc' sending a message to user 'xyz''s session path.
+       * @principle Ensures messages are only accessible/writable by the session owner.
+       */
+      match /messages/{messageId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.chatSessionId == chatSessionId;
+        allow update: if isExistingOwner(userId) && request.resource.data.chatSessionId == resource.data.chatSessionId;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    // Default deny for any paths not explicitly matched
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
