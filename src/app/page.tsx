@@ -82,7 +82,6 @@ export default function DashboardPage() {
       const sorted = allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setRecentTransactions(sorted.slice(0, 10));
 
-      // Calculate Stats
       const totalSpent = allTransactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
       const totalIncome = allTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
       
@@ -117,12 +116,12 @@ export default function DashboardPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-4">
-          <div className="flex items-center gap-2">
+        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 gap-4">
+          <div className="flex items-center gap-2 overflow-hidden">
             <SidebarTrigger />
-            <h2 className="text-lg font-semibold truncate">Overview</h2>
+            <h2 className="text-lg font-bold truncate text-primary">Overview</h2>
           </div>
-          <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end">
+          <div className="flex items-center gap-2 md:gap-4 justify-end flex-shrink-0">
             <DatePickerWithRange onRangeChange={setDateRange} />
             <AddExpenseDialog />
           </div>
@@ -136,16 +135,16 @@ export default function DashboardPage() {
               { title: 'Savings Rate', value: `${stats.savingsRate}%`, icon: ArrowUpRight, color: 'text-green-600' },
               { title: 'Projected Tax', value: `$${stats.projectedTax.toLocaleString()}`, icon: DollarSign, color: 'text-orange-600' },
             ].map((stat, i) => (
-              <Link href="/insights" key={i} className="block transition-transform hover:scale-[1.01]">
-                <Card className="border-none shadow-sm hover:shadow-md transition-shadow h-full cursor-pointer">
+              <Link href="/insights" key={i} className="block transition-all hover:scale-[1.02]">
+                <Card className="border-none shadow-sm hover:shadow-lg transition-all h-full cursor-pointer bg-white/60 backdrop-blur-sm">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
+                    <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{stat.title}</CardTitle>
                     <stat.icon className={cn("w-5 h-5", stat.color)} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-xl md:text-2xl font-bold">{stat.value}</div>
-                    <p className="text-[10px] md:text-xs mt-1 text-muted-foreground">
-                      Calculated for selected range
+                    <div className="text-xl md:text-2xl font-black text-foreground">{stat.value}</div>
+                    <p className="text-[10px] md:text-xs mt-1 text-muted-foreground font-medium">
+                      Live data for range
                     </p>
                   </CardContent>
                 </Card>
@@ -154,22 +153,22 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-            <Card className="lg:col-span-2 border-none shadow-sm">
+            <Card className="lg:col-span-2 border-none shadow-sm bg-white/60 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-lg">Spending Trends</CardTitle>
-                <CardDescription>Monthly expenditure breakdown</CardDescription>
+                <CardTitle className="text-lg font-bold">Spending Trends</CardTitle>
+                <CardDescription>Visual breakdown of your periodic expenditure</CardDescription>
               </CardHeader>
-              <CardContent className="h-[250px] md:h-[350px]">
+              <CardContent className="h-[250px] md:h-[400px] pr-0">
                 {isLoading ? (
                   <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData}>
+                    <BarChart data={chartData} margin={{ left: -10, right: 10 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} dx={-10} />
-                      <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                      <Bar dataKey="spent" radius={[4, 4, 0, 0]}>
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} />
+                      <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      <Bar dataKey="spent" radius={[6, 6, 0, 0]} barSize={40}>
                         {chartData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? 'hsl(var(--accent))' : 'hsl(var(--primary))'} />
                         ))}
@@ -180,39 +179,39 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm flex flex-col h-full">
+            <Card className="border-none shadow-sm flex flex-col h-full bg-white/60 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">Recent Activity</CardTitle>
-                  <CardDescription>Latest transactions & manual entries</CardDescription>
+                  <CardTitle className="text-lg font-bold">Activity Log</CardTitle>
+                  <CardDescription>Latest transactions & manual logs</CardDescription>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto max-h-[400px]">
-                <div className="space-y-4 md:space-y-5">
+              <CardContent className="flex-1 overflow-y-auto max-h-[450px]">
+                <div className="space-y-4">
                   {isLoading ? (
                     <div className="flex justify-center py-12">
                       <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
                     </div>
                   ) : recentTransactions.length > 0 ? (
                     recentTransactions.map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between gap-3 border-b border-muted pb-3 last:border-0 last:pb-0">
+                      <div key={tx.id} className="flex items-center justify-between gap-3 border-b border-muted pb-4 last:border-0 last:pb-0">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="bg-primary/10 p-2 rounded-full shrink-0">
+                          <div className="bg-primary/5 p-2 rounded-xl shrink-0 border border-primary/10">
                             <CreditCard className="w-4 h-4 text-primary" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold truncate">{tx.description}</p>
-                            <p className="text-[10px] md:text-xs text-muted-foreground truncate">{tx.category} • {tx.date}</p>
+                            <p className="text-sm font-bold truncate text-foreground">{tx.description}</p>
+                            <p className="text-[10px] md:text-xs text-muted-foreground font-medium truncate">{tx.category} • {tx.date}</p>
                           </div>
                         </div>
-                        <p className="text-sm font-bold shrink-0 text-foreground">
+                        <p className="text-sm font-black shrink-0 text-foreground">
                           ${Math.abs(tx.amount).toFixed(2)}
                         </p>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-8">
-                      <p className="text-sm text-muted-foreground">No activity in this period.</p>
+                    <div className="text-center py-12">
+                      <p className="text-sm text-muted-foreground font-medium">No activity in this period.</p>
                     </div>
                   )}
                 </div>

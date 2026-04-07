@@ -13,6 +13,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface DatePickerWithRangeProps {
   className?: string;
@@ -25,19 +26,18 @@ export function DatePickerWithRange({
 }: DatePickerWithRangeProps) {
   const [mounted, setMounted] = React.useState(false);
   const [date, setDate] = React.useState<DateRange | undefined>(undefined);
+  const isMobile = useIsMobile();
 
   React.useEffect(() => {
     setMounted(true);
-    // Initialize date only on client to avoid hydration mismatch
     const initialRange = {
       from: subMonths(new Date(), 1),
       to: new Date(),
     };
     setDate(initialRange);
     onRangeChange(initialRange);
-  }, []); // Only run once on mount
+  }, []);
 
-  // Sync state changes with parent, but only after initial mount
   React.useEffect(() => {
     if (mounted) {
       onRangeChange(date);
@@ -52,33 +52,32 @@ export function DatePickerWithRange({
             id="date"
             variant={"outline"}
             className={cn(
-              "w-[240px] md:w-[300px] justify-start text-left font-normal bg-white/50 border-primary/20",
+              "w-fit min-w-[160px] md:min-w-[280px] justify-start text-left font-normal bg-white/80 border-primary/20 hover:bg-white hover:border-primary/40 transition-all shadow-sm",
               !date && "text-muted-foreground"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4" />
+            <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
             {mounted && date?.from ? (
               date.to ? (
-                <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
-                </>
+                <span className="truncate text-xs md:text-sm">
+                  {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                </span>
               ) : (
-                format(date.from, "LLL dd, y")
+                <span className="text-xs md:text-sm">{format(date.from, "LLL dd, y")}</span>
               )
             ) : (
-              <span>Pick a date range</span>
+              <span className="text-xs md:text-sm font-medium">Filter by date</span>
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
+        <PopoverContent className="w-auto p-0 z-[100]" align="end">
           <Calendar
             initialFocus
             mode="range"
             defaultMonth={date?.from}
             selected={date}
             onSelect={setDate}
-            numberOfMonths={2}
+            numberOfMonths={isMobile ? 1 : 2}
           />
         </PopoverContent>
       </Popover>
