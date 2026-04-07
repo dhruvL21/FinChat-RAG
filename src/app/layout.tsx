@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
@@ -6,8 +5,8 @@ import { Toaster } from '@/components/ui/toaster';
 import AuthInit from '@/components/AuthInit';
 
 export const metadata: Metadata = {
-  title: 'FinChat AI - Personal Finance Assistant',
-  description: 'Intelligent RAG-based financial analysis and insights',
+  title: 'FinChat AI | Elite Financial Guardian',
+  description: 'Rigorous Indian Rupee (₹) based financial intelligence and strategist',
 };
 
 export default function RootLayout({

@@ -7,7 +7,7 @@ import {
   MessageSquare, 
   UploadCloud, 
   PieChart, 
-  ShieldCheck,
+  Landmark, 
   TrendingDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,8 +35,8 @@ export function AppSidebar() {
     <Sidebar className="border-r-0 shadow-2xl">
       <SidebarHeader className="p-8">
         <div className="flex items-center gap-3">
-          <div className="bg-accent rounded-xl p-2.5 shadow-lg shadow-accent/30 border border-white/20">
-            <ShieldCheck className="w-6 h-6 text-accent-foreground" />
+          <div className="bg-gradient-to-br from-accent to-primary rounded-xl p-2.5 shadow-lg shadow-accent/20 border border-white/10">
+            <Landmark className="w-6 h-6 text-white" />
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tighter text-white leading-none">FinChat AI</h1>
