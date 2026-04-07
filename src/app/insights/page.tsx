@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   ArrowRight,
   ShieldCheck,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -77,7 +78,6 @@ export default function InsightsPage() {
       }));
       setCategoryData(formattedCat);
 
-      // Simple budget logic simulation
       const budgets: Record<string, number> = { 'Food': 600, 'Rent': 2000, 'Travel': 500, 'Shopping': 400 };
       const formattedBudget = Object.entries(budgets).map(([name, budget]) => {
         const spent = catMap[name] || 0;
@@ -101,23 +101,6 @@ export default function InsightsPage() {
     loadInsights();
   }, [loadInsights]);
 
-  const handleReviewCoverage = () => {
-    const query = encodeURIComponent("I noticed an insurance coverage gap tip in my insights. Can you analyze my documents and tell me more about what's missing?");
-    router.push(`/chat?q=${query}`);
-  };
-
-  const handleTransferFunds = () => {
-    toast({
-      title: "Transfer Initiated",
-      description: "Transfer of $500 to High-Yield Savings is being processed.",
-    });
-  };
-
-  const handleViewSummary = () => {
-    const query = encodeURIComponent("Based on my income trends, can you give me a detailed breakdown of my tax liability for the selected period?");
-    router.push(`/chat?q=${query}`);
-  };
-
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -130,8 +113,8 @@ export default function InsightsPage() {
           <DatePickerWithRange onRangeChange={setDateRange} />
         </header>
 
-        <main className="p-4 md:p-8 space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <main className="p-4 md:p-8 space-y-6 md:space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
             <Card className="border-none shadow-sm h-full">
               <CardHeader>
                 <div className="flex items-center gap-3">
@@ -139,12 +122,12 @@ export default function InsightsPage() {
                     <PieChartIcon className="w-5 h-5 text-accent" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Spending by Category</CardTitle>
-                    <CardDescription className="text-xs">Distribution of expenses for selected range</CardDescription>
+                    <CardTitle className="text-lg">Spending Analysis</CardTitle>
+                    <CardDescription className="text-xs">Distribution across categories</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="h-[300px] md:h-[350px]">
+              <CardContent className="h-[300px] md:h-[400px]">
                 {isLoading ? (
                   <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
                 ) : categoryData.length > 0 ? (
@@ -168,7 +151,9 @@ export default function InsightsPage() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground text-sm">No spending data for this period.</div>
+                  <div className="h-full flex items-center justify-center text-muted-foreground text-sm text-center px-4">
+                    No spending data for this period. Try adjusting filters or uploading documents.
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -176,12 +161,12 @@ export default function InsightsPage() {
             <Card className="border-none shadow-sm h-full">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="bg-red-100 p-2 rounded-lg shrink-0">
+                  <div className="bg-red-50 p-2 rounded-lg shrink-0">
                     <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Budget Tracker</CardTitle>
-                    <CardDescription className="text-xs">Spending vs. predefined monthly targets</CardDescription>
+                    <CardTitle className="text-lg">Budget Threshold Monitor</CardTitle>
+                    <CardDescription className="text-xs">Warnings for exceeded limits</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -189,25 +174,33 @@ export default function InsightsPage() {
                 {isLoading ? (
                   <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
                 ) : budgetData.map((item, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-xs md:text-sm">
-                      <span className="font-medium">{item.name}</span>
-                      <span className={cn(
-                        "font-bold",
-                        item.percent > 100 ? "text-red-600" : "text-green-600"
-                      )}>
-                        ${item.spent} / ${item.budget} ({item.percent}%)
-                      </span>
+                  <div key={i} className="space-y-3">
+                    <div className="flex justify-between items-end text-xs md:text-sm">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-foreground">{item.name}</span>
+                        <span className="text-muted-foreground text-[10px]">Target: ${item.budget}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className={cn(
+                          "font-bold text-base md:text-lg",
+                          item.percent > 100 ? "text-red-600" : "text-green-600"
+                        )}>
+                          ${item.spent}
+                        </span>
+                        <span className="text-muted-foreground text-[10px] ml-1">({item.percent}%)</span>
+                      </div>
                     </div>
                     <Progress value={Math.min(item.percent, 100)} className={cn(
-                      "h-2",
+                      "h-3",
                       item.percent > 100 ? "bg-red-100 [&>div]:bg-red-500" : "bg-green-100 [&>div]:bg-green-500"
                     )} />
                     {item.percent > 100 && (
-                      <p className="text-[10px] text-red-600 flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" />
-                        Exceeded by ${item.spent - item.budget}
-                      </p>
+                      <div className="bg-red-50 border border-red-100 p-2 rounded-md flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                        <p className="text-[10px] md:text-xs text-red-700 font-medium">
+                          CRITICAL: Over budget by ${item.spent - item.budget}! Consult FinChat AI for recovery strategies.
+                        </p>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -215,40 +208,40 @@ export default function InsightsPage() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <Card className="border-none bg-primary text-primary-foreground shadow-sm flex flex-col">
               <CardContent className="p-6 flex-1 flex flex-col">
                 <ShieldCheck className="w-8 h-8 mb-4 opacity-50 shrink-0" />
-                <h4 className="font-bold mb-2">Insurance Review</h4>
+                <h4 className="font-bold mb-2">Limit Analysis</h4>
                 <p className="text-xs md:text-sm opacity-80 leading-relaxed mb-6 flex-1">
-                  We found a potential coverage gap based on your analyzed transactions.
+                  Ask FinChat AI to analyze specific items that caused budget breaches.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-primary mt-auto" onClick={handleReviewCoverage}>
-                  Review Coverage <ArrowRight className="w-4 h-4 ml-2" />
+                <Button variant="secondary" size="sm" className="w-full text-primary mt-auto" onClick={() => router.push('/chat?q=Analyze my food spending. Which specific items caused me to go over budget?')}>
+                  Analyze Items <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>
             <Card className="border-none bg-accent text-accent-foreground shadow-sm flex flex-col">
               <CardContent className="p-6 flex-1 flex flex-col">
                 <TrendingUp className="w-8 h-8 mb-4 opacity-50 shrink-0" />
-                <h4 className="font-bold mb-2">Savings Tip</h4>
+                <h4 className="font-bold mb-2">Spending Warning</h4>
                 <p className="text-xs md:text-sm opacity-80 leading-relaxed mb-6 flex-1">
-                  Your current surplus could be earning more interest in a high-yield account.
+                  Your "Miscellaneous" spending is rising. Let's find the hidden leaks.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-accent mt-auto" onClick={handleTransferFunds}>
-                  Transfer Funds <ArrowRight className="w-4 h-4 ml-2" />
+                <Button variant="secondary" size="sm" className="w-full text-accent mt-auto" onClick={() => router.push('/chat?q=Show me a detailed breakdown of my miscellaneous expenses and identify potential waste.')}>
+                  Find Leaks <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>
             <Card className="border-none bg-white shadow-sm flex flex-col md:col-span-2 lg:col-span-1">
-              <CardContent className="p-6 flex-1 flex flex-col">
+              <CardContent className="p-6 flex-1 flex flex-col border border-muted rounded-lg">
                 <PieChartIcon className="w-8 h-8 mb-4 text-primary opacity-20 shrink-0" />
-                <h4 className="font-bold mb-2 text-foreground">Tax Projection</h4>
+                <h4 className="font-bold mb-2 text-foreground">Recovery Plan</h4>
                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-6 flex-1">
-                  Get a breakdown of your estimated tax liability for the selected period.
+                  Exceeded your total limit? Generate an AI-powered financial recovery plan.
                 </p>
-                <Button variant="outline" size="sm" className="w-full mt-auto" onClick={handleViewSummary}>
-                  View Summary <ArrowRight className="w-4 h-4 ml-2" />
+                <Button variant="outline" size="sm" className="w-full mt-auto" onClick={() => router.push('/chat?q=I exceeded my monthly budget. Create a strict recovery plan for next month.')}>
+                  Get Plan <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>

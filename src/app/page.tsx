@@ -13,7 +13,8 @@ import {
   CreditCard, 
   DollarSign,
   Loader2,
-  TrendingDown
+  TrendingDown,
+  AlertCircle
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -29,6 +30,7 @@ import type { Transaction } from '@/lib/types';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { DateRange } from 'react-day-picker';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -85,13 +87,12 @@ export default function DashboardPage() {
       const totalIncome = allTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
       
       setStats({
-        totalBalance: 12450 + (totalIncome - totalSpent), // Base balance simulation
+        totalBalance: 12450 + (totalIncome - totalSpent), 
         monthlySpending: totalSpent,
         savingsRate: totalIncome > 0 ? Math.round(((totalIncome - totalSpent) / totalIncome) * 100) : 0,
-        projectedTax: totalIncome * 0.15 // Simple tax simulation
+        projectedTax: totalIncome * 0.15 
       });
 
-      // Group for chart by month
       const monthMap: Record<string, number> = {};
       allTransactions.forEach(tx => {
         const month = new Date(tx.date).toLocaleString('default', { month: 'short' });
@@ -128,23 +129,23 @@ export default function DashboardPage() {
         </header>
 
         <main className="p-4 md:p-8 space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { title: 'Total Balance', value: `$${stats.totalBalance.toLocaleString()}`, trend: '+2.5%', icon: Wallet, color: 'text-primary' },
-              { title: 'Period Spending', value: `$${stats.monthlySpending.toLocaleString()}`, trend: '-10.2%', icon: CreditCard, color: 'text-accent' },
-              { title: 'Savings Rate', value: `${stats.savingsRate}%`, trend: '+5.4%', icon: ArrowUpRight, color: 'text-green-600' },
-              { title: 'Projected Tax', value: `$${stats.projectedTax.toLocaleString()}`, trend: 'Neutral', icon: DollarSign, color: 'text-orange-600' },
+              { title: 'Total Balance', value: `$${stats.totalBalance.toLocaleString()}`, icon: Wallet, color: 'text-primary' },
+              { title: 'Period Spending', value: `$${stats.monthlySpending.toLocaleString()}`, icon: CreditCard, color: 'text-accent' },
+              { title: 'Savings Rate', value: `${stats.savingsRate}%`, icon: ArrowUpRight, color: 'text-green-600' },
+              { title: 'Projected Tax', value: `$${stats.projectedTax.toLocaleString()}`, icon: DollarSign, color: 'text-orange-600' },
             ].map((stat, i) => (
-              <Link href="/insights" key={i} className="block transition-transform hover:scale-[1.02]">
+              <Link href="/insights" key={i} className="block transition-transform hover:scale-[1.01]">
                 <Card className="border-none shadow-sm hover:shadow-md transition-shadow h-full cursor-pointer">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                    <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                    <stat.icon className={cn("w-5 h-5", stat.color)} />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className={`text-xs mt-1 text-muted-foreground`}>
-                      Calculated for selected period
+                    <div className="text-xl md:text-2xl font-bold">{stat.value}</div>
+                    <p className="text-[10px] md:text-xs mt-1 text-muted-foreground">
+                      Calculated for selected range
                     </p>
                   </CardContent>
                 </Card>
@@ -152,21 +153,21 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
             <Card className="lg:col-span-2 border-none shadow-sm">
               <CardHeader>
-                <CardTitle>Spending Trends</CardTitle>
-                <CardDescription>Expenditure breakdown by month for selected range</CardDescription>
+                <CardTitle className="text-lg">Spending Trends</CardTitle>
+                <CardDescription>Monthly expenditure breakdown</CardDescription>
               </CardHeader>
-              <CardContent className="h-[300px] md:h-[350px]">
+              <CardContent className="h-[250px] md:h-[350px]">
                 {isLoading ? (
                   <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dx={-10} />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} dx={-10} />
                       <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                       <Bar dataKey="spent" radius={[4, 4, 0, 0]}>
                         {chartData.map((entry, index) => (
@@ -179,33 +180,32 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm flex flex-col h-full">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>Latest parsed transactions</CardDescription>
+                  <CardTitle className="text-lg">Recent Activity</CardTitle>
+                  <CardDescription>Latest transactions & manual entries</CardDescription>
                 </div>
-                <TrendingDown className="w-5 h-5 text-muted-foreground opacity-20" />
               </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
+              <CardContent className="flex-1 overflow-y-auto max-h-[400px]">
+                <div className="space-y-4 md:space-y-5">
                   {isLoading ? (
                     <div className="flex justify-center py-12">
                       <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
                     </div>
                   ) : recentTransactions.length > 0 ? (
                     recentTransactions.map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between gap-2">
+                      <div key={tx.id} className="flex items-center justify-between gap-3 border-b border-muted pb-3 last:border-0 last:pb-0">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="bg-primary/10 p-2 rounded-full shrink-0">
                             <CreditCard className="w-4 h-4 text-primary" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{tx.description}</p>
-                            <p className="text-xs text-muted-foreground truncate">{tx.category} • {tx.date}</p>
+                            <p className="text-sm font-semibold truncate">{tx.description}</p>
+                            <p className="text-[10px] md:text-xs text-muted-foreground truncate">{tx.category} • {tx.date}</p>
                           </div>
                         </div>
-                        <p className={`text-sm font-bold shrink-0 text-foreground`}>
+                        <p className="text-sm font-bold shrink-0 text-foreground">
                           ${Math.abs(tx.amount).toFixed(2)}
                         </p>
                       </div>
