@@ -1,18 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { AddExpenseDialog } from '@/components/finchat/add-expense-dialog';
+import { DatePickerWithRange } from '@/components/finchat/date-range-picker';
 import { 
   ArrowUpRight, 
-  ArrowDownRight, 
   Wallet, 
   CreditCard, 
-  Calendar,
   DollarSign,
-  Loader2
+  Loader2,
+  TrendingDown
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -26,89 +27,113 @@ import {
 } from 'recharts';
 import type { Transaction } from '@/lib/types';
 import { useFirestore, useUser } from '@/firebase';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
-
-const chartData = [
-  { name: 'Jan', spent: 2400 },
-  { name: 'Feb', spent: 1398 },
-  { name: 'Mar', spent: 9800 },
-  { name: 'Apr', spent: 3908 },
-  { name: 'May', spent: 4800 },
-  { name: 'Jun', spent: 3800 },
-];
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { DateRange } from 'react-day-picker';
 
 export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [stats, setStats] = useState({
+    totalBalance: 0,
+    monthlySpending: 0,
+    savingsRate: 0,
+    projectedTax: 0
+  });
+  const [chartData, setChartData] = useState<{name: string, spent: number}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const { user } = useUser();
   const db = useFirestore();
 
-  useEffect(() => {
-    async function load() {
-      if (!user || !db) return;
-      setIsLoading(true);
-      try {
-        const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
-        const txs: Transaction[] = [];
+  const loadData = useCallback(async () => {
+    if (!user || !db || !dateRange?.from || !dateRange?.to) return;
+    
+    setIsLoading(true);
+    try {
+      const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
+      const allTransactions: Transaction[] = [];
+      
+      const start = dateRange.from.toISOString().split('T')[0];
+      const end = dateRange.to.toISOString().split('T')[0];
+
+      for (const docSnap of docsSnapshot.docs) {
+        const chunksSnapshot = await getDocs(query(
+          collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'),
+          where('transactionDate', '>=', start),
+          where('transactionDate', '<=', end)
+        ));
         
-        for (const docSnap of docsSnapshot.docs) {
-          const chunksSnapshot = await getDocs(query(
-            collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'),
-            orderBy('transactionDate', 'desc'),
-            limit(10)
-          ));
-          
-          chunksSnapshot.forEach(chunk => {
-            const data = chunk.data();
-            if (data.amount !== undefined) {
-              txs.push({
-                id: chunk.id,
-                date: data.transactionDate,
-                description: data.chunkText.split(',')[1] || 'Transaction',
-                amount: data.amount,
-                category: data.category || 'Miscellaneous',
-                sourceFile: docSnap.data().filename
-              });
-            }
-          });
-        }
-        
-        setRecentTransactions(txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsLoading(false);
+        chunksSnapshot.forEach(chunk => {
+          const data = chunk.data();
+          if (data.amount !== undefined) {
+            allTransactions.push({
+              id: chunk.id,
+              date: data.transactionDate,
+              description: data.chunkText.split(',')[1]?.trim() || 'Transaction',
+              amount: data.amount,
+              category: data.category || 'Miscellaneous',
+              sourceFile: docSnap.data().filename
+            });
+          }
+        });
       }
+      
+      const sorted = allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setRecentTransactions(sorted.slice(0, 10));
+
+      // Calculate Stats
+      const totalSpent = allTransactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
+      const totalIncome = allTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
+      
+      setStats({
+        totalBalance: 12450 + (totalIncome - totalSpent), // Base balance simulation
+        monthlySpending: totalSpent,
+        savingsRate: totalIncome > 0 ? Math.round(((totalIncome - totalSpent) / totalIncome) * 100) : 0,
+        projectedTax: totalIncome * 0.15 // Simple tax simulation
+      });
+
+      // Group for chart by month
+      const monthMap: Record<string, number> = {};
+      allTransactions.forEach(tx => {
+        const month = new Date(tx.date).toLocaleString('default', { month: 'short' });
+        monthMap[month] = (monthMap[month] || 0) + (tx.amount > 0 ? tx.amount : 0);
+      });
+
+      const formattedChart = Object.entries(monthMap).map(([name, spent]) => ({ name, spent }));
+      setChartData(formattedChart.length > 0 ? formattedChart : [{ name: 'No Data', spent: 0 }]);
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
     }
-    load();
-  }, [user, db]);
+  }, [user, db, dateRange]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-2">
+        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-4">
           <div className="flex items-center gap-2">
             <SidebarTrigger />
             <h2 className="text-lg font-semibold truncate">Overview</h2>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="bg-secondary px-3 py-1 rounded-full flex items-center gap-2 text-xs md:text-sm font-medium whitespace-nowrap">
-              <Calendar className="w-3 h-3 md:w-4 h-4" />
-              <span className="hidden sm:inline">Oct 2023 - Mar 2024</span>
-              <span className="sm:hidden">Current</span>
-            </div>
+          <div className="flex items-center gap-2 md:gap-4 flex-wrap justify-end">
+            <DatePickerWithRange onRangeChange={setDateRange} />
+            <AddExpenseDialog />
           </div>
         </header>
 
         <main className="p-4 md:p-8 space-y-8">
-          {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { title: 'Total Balance', value: '$12,450.00', trend: '+2.5%', icon: Wallet, color: 'text-primary' },
-              { title: 'Monthly Spending', value: '$3,820.00', trend: '-10.2%', icon: CreditCard, color: 'text-accent' },
-              { title: 'Savings Rate', value: '24%', trend: '+5.4%', icon: ArrowUpRight, color: 'text-green-600' },
-              { title: 'Projected Tax', value: '$1,200.00', trend: 'Neutral', icon: DollarSign, color: 'text-orange-600' },
+              { title: 'Total Balance', value: `$${stats.totalBalance.toLocaleString()}`, trend: '+2.5%', icon: Wallet, color: 'text-primary' },
+              { title: 'Period Spending', value: `$${stats.monthlySpending.toLocaleString()}`, trend: '-10.2%', icon: CreditCard, color: 'text-accent' },
+              { title: 'Savings Rate', value: `${stats.savingsRate}%`, trend: '+5.4%', icon: ArrowUpRight, color: 'text-green-600' },
+              { title: 'Projected Tax', value: `$${stats.projectedTax.toLocaleString()}`, trend: 'Neutral', icon: DollarSign, color: 'text-orange-600' },
             ].map((stat, i) => (
               <Link href="/insights" key={i} className="block transition-transform hover:scale-[1.02]">
                 <Card className="border-none shadow-sm hover:shadow-md transition-shadow h-full cursor-pointer">
@@ -118,8 +143,8 @@ export default function DashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className={`text-xs mt-1 ${stat.trend.startsWith('+') ? 'text-green-600' : stat.trend.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
-                      {stat.trend} from last month
+                    <p className={`text-xs mt-1 text-muted-foreground`}>
+                      Calculated for selected period
                     </p>
                   </CardContent>
                 </Card>
@@ -128,48 +153,39 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Spending Chart */}
             <Card className="lg:col-span-2 border-none shadow-sm">
               <CardHeader>
                 <CardTitle>Spending Trends</CardTitle>
-                <CardDescription>Monthly expenditure across all accounts</CardDescription>
+                <CardDescription>Expenditure breakdown by month for selected range</CardDescription>
               </CardHeader>
               <CardContent className="h-[300px] md:h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#6b7280', fontSize: 12 }}
-                      dy={10}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#6b7280', fontSize: 12 }}
-                      dx={-10}
-                    />
-                    <Tooltip 
-                      cursor={{ fill: '#f3f4f6' }}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Bar dataKey="spent" radius={[4, 4, 0, 0]}>
-                      {chartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 2 ? 'hsl(var(--accent))' : 'hsl(var(--primary))'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {isLoading ? (
+                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 12 }} dx={-10} />
+                      <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                      <Bar dataKey="spent" radius={[4, 4, 0, 0]}>
+                        {chartData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? 'hsl(var(--accent))' : 'hsl(var(--primary))'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </CardContent>
             </Card>
 
-            {/* Recent Transactions */}
             <Card className="border-none shadow-sm">
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Latest parsed transactions</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>Latest parsed transactions</CardDescription>
+                </div>
+                <TrendingDown className="w-5 h-5 text-muted-foreground opacity-20" />
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
@@ -189,15 +205,14 @@ export default function DashboardPage() {
                             <p className="text-xs text-muted-foreground truncate">{tx.category} • {tx.date}</p>
                           </div>
                         </div>
-                        <p className={`text-sm font-bold shrink-0 ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {tx.amount < 0 ? '-' : '+'}${Math.abs(tx.amount).toFixed(2)}
+                        <p className={`text-sm font-bold shrink-0 text-foreground`}>
+                          ${Math.abs(tx.amount).toFixed(2)}
                         </p>
                       </div>
                     ))
                   ) : (
                     <div className="text-center py-8">
-                      <p className="text-sm text-muted-foreground">No recent transactions found.</p>
-                      <p className="text-xs text-muted-foreground mt-1">Upload a CSV to get started.</p>
+                      <p className="text-sm text-muted-foreground">No activity in this period.</p>
                     </div>
                   )}
                 </div>
