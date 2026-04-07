@@ -68,6 +68,3 @@ npm run genkit:dev
 ## 🔒 Security & Privacy
 
 FinChat AI implements **Strict Ownership-based Authorization**. All documents, transaction segments, and chat sessions are stored in private Firestore hierarchies (`/users/{userId}/...`). Security rules ensure that only the authenticated user (including anonymous sessions) can read or write their own financial records.
-
----
-*Built with ❤️ for Financial Freedom.*
