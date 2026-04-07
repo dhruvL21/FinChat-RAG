@@ -101,7 +101,15 @@ export default function InsightsPage() {
       }));
       setCategoryData(formattedCat);
 
-      const budgets: Record<string, number> = { 'Food': 600, 'Rent': 2000, 'Travel': 500, 'Shopping': 400, 'Utilities': 300 };
+      // Budgets in INR
+      const budgets: Record<string, number> = { 
+        'Food': 15000, 
+        'Rent': 45000, 
+        'EMI': 25000,
+        'Travel': 10000, 
+        'Shopping': 8000, 
+        'Utilities': 5000 
+      };
       const formattedBudget = Object.entries(budgets).map(([name, budget]) => {
         const spent = catMap[name] || 0;
         return {
@@ -169,7 +177,10 @@ export default function InsightsPage() {
                           <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
                         ))}
                       </Pie>
-                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                        formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
+                      />
                       <Legend verticalAlign="bottom" height={36} iconSize={10} wrapperStyle={{ fontSize: '11px', fontWeight: '500' }}/>
                     </PieChart>
                   </ResponsiveContainer>
@@ -189,7 +200,7 @@ export default function InsightsPage() {
                   </div>
                   <div>
                     <CardTitle className="text-lg font-bold">Budget Guardrail</CardTitle>
-                    <CardDescription className="text-xs font-medium">Real-time limit monitoring</CardDescription>
+                    <CardDescription className="text-xs font-medium">Real-time limit monitoring (INR)</CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -201,14 +212,14 @@ export default function InsightsPage() {
                     <div className="flex justify-between items-end">
                       <div className="flex flex-col">
                         <span className="font-bold text-sm text-foreground">{item.name}</span>
-                        <span className="text-muted-foreground text-[10px] font-bold">LIMIT: ${item.budget}</span>
+                        <span className="text-muted-foreground text-[10px] font-bold">LIMIT: ₹{item.budget.toLocaleString('en-IN')}</span>
                       </div>
                       <div className="text-right">
                         <span className={cn(
                           "font-black text-lg",
                           item.percent > 100 ? "text-red-600" : "text-green-600"
                         )}>
-                          ${item.spent}
+                          ₹{item.spent.toLocaleString('en-IN')}
                         </span>
                         <span className="text-muted-foreground text-[10px] ml-1 font-bold">({item.percent}%)</span>
                       </div>
@@ -221,7 +232,7 @@ export default function InsightsPage() {
                       <div className="bg-red-50 border border-red-100 p-2.5 rounded-xl flex items-center gap-2 animate-pulse">
                         <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
                         <p className="text-[10px] text-red-700 font-bold leading-tight">
-                          CRITICAL: Budget breached by ${item.spent - item.budget}! Ask AI to analyze specific waste items.
+                          CRITICAL: Budget breached by ₹{(item.spent - item.budget).toLocaleString('en-IN')}! Ask AI to analyze specific waste items.
                         </p>
                       </div>
                     )}
@@ -266,7 +277,7 @@ export default function InsightsPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-xs font-black py-3 text-right">
-                            ${Math.abs(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            ₹{Math.abs(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -289,7 +300,7 @@ export default function InsightsPage() {
                 <p className="text-xs opacity-90 leading-relaxed mb-6 flex-1 font-medium">
                   Deep-dive into specific items that caused your budget breaches this period.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-primary font-bold mt-auto" onClick={() => router.push('/chat?q=Analyze my food spending. Which specific items caused me to go over budget?')}>
+                <Button variant="secondary" size="sm" className="w-full text-primary font-bold mt-auto" onClick={() => router.push('/chat?q=Analyze my food spending. Which specific items caused me to go over my ₹15,000 budget?')}>
                   Analyze Items <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>

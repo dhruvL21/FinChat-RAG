@@ -29,7 +29,7 @@ function ChatContent() {
   const [messages, setMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([
     { 
       role: 'assistant', 
-      content: "Hello! I'm your FinChat Assistant. Ask me anything about your uploaded financial documents, bank statements, or overall spending patterns." 
+      content: "Namaste! I'm your FinChat Assistant. Ask me anything about your uploaded financial documents, bank statements, or overall spending patterns in Rupees (₹)." 
     }
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -122,7 +122,7 @@ function ChatContent() {
         </div>
         <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => setMessages([{ 
           role: 'assistant', 
-          content: "Hello! I'm your FinChat Assistant. Ask me anything about your uploaded financial documents, bank statements, or overall spending patterns." 
+          content: "Namaste! I'm your FinChat Assistant. Ask me anything about your uploaded financial documents, bank statements, or overall spending patterns in Rupees (₹)." 
         }])}>
           <PlusCircle className="w-4 h-4" />
           <span className="hidden sm:inline">New Analysis</span>
@@ -176,7 +176,7 @@ function ChatContent() {
       <div className="p-4 md:p-8 bg-white/50 backdrop-blur-md border-t">
         <div className="max-w-4xl mx-auto relative">
           <Input 
-            placeholder="Ask about spending, coverage..." 
+            placeholder="Ask about spending in ₹, coverage..." 
             className="pr-12 py-6 bg-white shadow-sm border-primary/20 focus-visible:ring-primary"
             value={input}
             onChange={(e) => setInput(e.target.value)}

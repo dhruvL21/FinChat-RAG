@@ -88,7 +88,7 @@ export function AddExpenseDialog() {
 
       toast({
         title: "Expense Added",
-        description: `Successfully logged $${formData.amount} for ${formData.description}.`
+        description: `Successfully logged ₹${formData.amount} for ${formData.description}.`
       });
       setOpen(false);
       setFormData({
@@ -145,7 +145,7 @@ export function AddExpenseDialog() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount ($)</Label>
+            <Label htmlFor="amount">Amount (₹)</Label>
             <Input 
               id="amount" 
               type="number" 

@@ -86,7 +86,7 @@ export default function DashboardPage() {
       const totalIncome = allTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
       
       setStats({
-        totalBalance: 12450 + (totalIncome - totalSpent), 
+        totalBalance: 250000 + (totalIncome - totalSpent), 
         monthlySpending: totalSpent,
         savingsRate: totalIncome > 0 ? Math.round(((totalIncome - totalSpent) / totalIncome) * 100) : 0,
         projectedTax: totalIncome * 0.15 
@@ -130,10 +130,10 @@ export default function DashboardPage() {
         <main className="p-4 md:p-8 space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { title: 'Total Balance', value: `$${stats.totalBalance.toLocaleString()}`, icon: Wallet, color: 'text-primary' },
-              { title: 'Period Spending', value: `$${stats.monthlySpending.toLocaleString()}`, icon: CreditCard, color: 'text-accent' },
+              { title: 'Total Balance', value: `₹${stats.totalBalance.toLocaleString('en-IN')}`, icon: Wallet, color: 'text-primary' },
+              { title: 'Period Spending', value: `₹${stats.monthlySpending.toLocaleString('en-IN')}`, icon: CreditCard, color: 'text-accent' },
               { title: 'Savings Rate', value: `${stats.savingsRate}%`, icon: ArrowUpRight, color: 'text-green-600' },
-              { title: 'Projected Tax', value: `$${stats.projectedTax.toLocaleString()}`, icon: DollarSign, color: 'text-orange-600' },
+              { title: 'Projected Tax', value: `₹${stats.projectedTax.toLocaleString('en-IN')}`, icon: DollarSign, color: 'text-orange-600' },
             ].map((stat, i) => (
               <Link href="/insights" key={i} className="block transition-all hover:scale-[1.02]">
                 <Card className="border-none shadow-sm hover:shadow-lg transition-all h-full cursor-pointer bg-white/60 backdrop-blur-sm">
@@ -167,7 +167,11 @@ export default function DashboardPage() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} dy={10} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} />
-                      <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                      <Tooltip 
+                        cursor={{ fill: '#f3f4f6' }} 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Spent']}
+                      />
                       <Bar dataKey="spent" radius={[6, 6, 0, 0]} barSize={40}>
                         {chartData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? 'hsl(var(--accent))' : 'hsl(var(--primary))'} />
@@ -205,7 +209,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <p className="text-sm font-black shrink-0 text-foreground">
-                          ${Math.abs(tx.amount).toFixed(2)}
+                          ₹{Math.abs(tx.amount).toLocaleString('en-IN')}
                         </p>
                       </div>
                     ))
