@@ -1,10 +1,12 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 import { 
   PieChart as PieChartIcon, 
   TrendingUp, 
@@ -37,6 +39,26 @@ const budgetData = [
 ];
 
 export default function InsightsPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+
+  const handleReviewCoverage = () => {
+    const query = encodeURIComponent("I noticed an insurance coverage gap tip in my insights. Can you analyze my documents and tell me more about what's missing?");
+    router.push(`/chat?q=${query}`);
+  };
+
+  const handleTransferFunds = () => {
+    toast({
+      title: "Transfer Initiated",
+      description: "Transfer of $500 to High-Yield Savings is being processed. (Simulation)",
+    });
+  };
+
+  const handleViewSummary = () => {
+    const query = encodeURIComponent("Based on my income trends, can you give me a detailed breakdown of my $3,400 estimated tax liability for next quarter?");
+    router.push(`/chat?q=${query}`);
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -136,7 +158,7 @@ export default function InsightsPage() {
                 <p className="text-xs md:text-sm opacity-80 leading-relaxed mb-6 flex-1">
                   We found a potential coverage gap in your health insurance based on your recent tax filing.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-primary mt-auto">
+                <Button variant="secondary" size="sm" className="w-full text-primary mt-auto" onClick={handleReviewCoverage}>
                   Review Coverage <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
@@ -148,7 +170,7 @@ export default function InsightsPage() {
                 <p className="text-xs md:text-sm opacity-80 leading-relaxed mb-6 flex-1">
                   You have a surplus in your checking account. Consider moving it to your high-yield savings.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-accent mt-auto">
+                <Button variant="secondary" size="sm" className="w-full text-accent mt-auto" onClick={handleTransferFunds}>
                   Transfer Funds <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
@@ -160,7 +182,7 @@ export default function InsightsPage() {
                 <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-6 flex-1">
                   Estimated tax liability for next quarter is $3,400 based on your current income trends.
                 </p>
-                <Button variant="outline" size="sm" className="w-full mt-auto">
+                <Button variant="outline" size="sm" className="w-full mt-auto" onClick={handleViewSummary}>
                   View Summary <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>

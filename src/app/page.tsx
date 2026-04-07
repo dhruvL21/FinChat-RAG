@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -109,18 +110,20 @@ export default function DashboardPage() {
               { title: 'Savings Rate', value: '24%', trend: '+5.4%', icon: ArrowUpRight, color: 'text-green-600' },
               { title: 'Projected Tax', value: '$1,200.00', trend: 'Neutral', icon: DollarSign, color: 'text-orange-600' },
             ].map((stat, i) => (
-              <Card key={i} className="border-none shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className={`text-xs mt-1 ${stat.trend.startsWith('+') ? 'text-green-600' : stat.trend.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
-                    {stat.trend} from last month
-                  </p>
-                </CardContent>
-              </Card>
+              <Link href="/insights" key={i} className="block transition-transform hover:scale-[1.02]">
+                <Card className="border-none shadow-sm hover:shadow-md transition-shadow h-full cursor-pointer">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
+                    <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stat.value}</div>
+                    <p className={`text-xs mt-1 ${stat.trend.startsWith('+') ? 'text-green-600' : stat.trend.startsWith('-') ? 'text-red-600' : 'text-muted-foreground'}`}>
+                      {stat.trend} from last month
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>
 
