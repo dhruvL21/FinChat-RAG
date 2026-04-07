@@ -1,10 +1,10 @@
 'use server';
 /**
- * @fileOverview A Genkit flow to categorize financial expenses based on transaction descriptions.
+ * @fileOverview A Genkit flow to categorize financial expenses based on transaction descriptions in batches.
  *
- * - categorizeExpense - A function that handles the expense categorization process.
- * - CategorizeExpenseInput - The input type for the categorizeExpense function.
- * - CategorizeExpenseOutput - The return type for the categorizeExpense function.
+ * - categorizeExpenses - A function that handles the batch expense categorization process.
+ * - CategorizeExpenseInput - The input type for the categorizeExpenses function.
+ * - CategorizeExpenseOutput - The return type for the categorizeExpenses function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -26,12 +26,15 @@ const ExpenseCategorySchema = z.union([
 ]).describe('A predefined category for a financial transaction.');
 
 const CategorizeExpenseInputSchema = z.object({
-  transactionDescription: z.string().describe('The description of a financial transaction.'),
+  descriptions: z.array(z.string()).describe('A list of financial transaction descriptions to categorize.'),
 });
 export type CategorizeExpenseInput = z.infer<typeof CategorizeExpenseInputSchema>;
 
 const CategorizeExpenseOutputSchema = z.object({
-  category: ExpenseCategorySchema,
+  results: z.array(z.object({
+    description: z.string(),
+    category: ExpenseCategorySchema,
+  })).describe('The categorization results for each input description.'),
 });
 export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
 
@@ -40,17 +43,20 @@ const prompt = ai.definePrompt({
   input: { schema: CategorizeExpenseInputSchema },
   output: { schema: CategorizeExpenseOutputSchema },
   prompt: `You are an AI assistant specialized in categorizing financial transactions.
-Given a transaction description, categorize it into one of the following categories:
+Given a list of transaction descriptions, categorize each one into one of the following categories:
 'Food', 'Rent', 'EMI', 'Travel', 'Utilities', 'Shopping', 'Entertainment', 'Healthcare', 'Education', 'Salary', 'Investment', 'Miscellaneous'.
-If the transaction does not fit any of the specific categories, assign it to 'Miscellaneous'.
+If a transaction does not fit any of the specific categories, assign it to 'Miscellaneous'.
 
-Transaction Description: "{{{transactionDescription}}}"
+Transactions:
+{{#each descriptions}}
+- {{{this}}}
+{{/each}}
 `,
 });
 
-const categorizeExpenseFlow = ai.defineFlow(
+const categorizeExpensesFlow = ai.defineFlow(
   {
-    name: 'categorizeExpenseFlow',
+    name: 'categorizeExpensesFlow',
     inputSchema: CategorizeExpenseInputSchema,
     outputSchema: CategorizeExpenseOutputSchema,
   },
@@ -60,6 +66,6 @@ const categorizeExpenseFlow = ai.defineFlow(
   }
 );
 
-export async function categorizeExpense(input: CategorizeExpenseInput): Promise<CategorizeExpenseOutput> {
-  return categorizeExpenseFlow(input);
+export async function categorizeExpenses(input: CategorizeExpenseInput): Promise<CategorizeExpenseOutput> {
+  return categorizeExpensesFlow(input);
 }
