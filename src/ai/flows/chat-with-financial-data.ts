@@ -59,9 +59,7 @@ Content: {{{this.text}}}
 
 User's Question: {{{userQuery}}}
 
-Please provide a concise answer to the user's question, strictly using the provided financial data. For each piece of information you provide, indicate which 'Source Document' (and optionally its date, category, and amount if relevant) it came from.
-
-Finally, provide a 'Sources:' section at the end of your answer, listing the fileName and date for each source that you explicitly used to formulate your answer.`,
+Please provide a concise and professional answer to the user's question, strictly using the provided financial data. Do not include inline citations, source document names, or dates within your answer text. The response should be conversational and easy to read.`,
 });
 
 const chatWithFinancialDataFlow = ai.defineFlow(

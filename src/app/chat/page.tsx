@@ -11,8 +11,6 @@ import {
   Bot, 
   User, 
   Loader2, 
-  FileText, 
-  ExternalLink,
   PlusCircle,
   MessageSquare
 } from 'lucide-react';
@@ -22,7 +20,6 @@ import { cn } from '@/lib/utils';
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-  sources?: { text: string; fileName: string; date?: string }[];
 }
 
 export default function ChatPage() {
@@ -54,8 +51,7 @@ export default function ChatPage() {
       const response = await askFinancialQuestion(userMsg);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: response.answer, 
-        sources: response.sources 
+        content: response.answer
       }]);
     } catch (error) {
       setMessages(prev => [...prev, { 
@@ -110,21 +106,6 @@ export default function ChatPage() {
                     {msg.content}
                   </CardContent>
                 </Card>
-
-                {msg.sources && msg.sources.length > 0 && (
-                  <div className="space-y-2 mt-2">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest pl-2">Evidence & Sources</p>
-                    <div className="flex flex-wrap gap-2">
-                      {msg.sources.map((source, si) => (
-                        <div key={si} className="bg-white border rounded-lg p-2 text-[11px] flex items-center gap-2 group hover:border-primary transition-colors cursor-default max-w-[200px]">
-                          <FileText className="w-3 h-3 text-primary shrink-0" />
-                          <span className="truncate">{source.fileName}</span>
-                          <span className="text-[9px] text-muted-foreground ml-auto">{source.date}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           ))}
