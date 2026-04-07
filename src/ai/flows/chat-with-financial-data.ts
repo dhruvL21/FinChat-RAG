@@ -27,15 +27,8 @@ const ChatWithFinancialDataInputSchema = z.object({
 
 export type ChatWithFinancialDataInput = z.infer<typeof ChatWithFinancialDataInputSchema>;
 
-const SourceSchema = z.object({
-  text: z.string().describe('The content of the original source chunk.'),
-  fileName: z.string().describe('The name of the file from which this source was extracted.'),
-  date: z.string().describe('The date associated with this source.').optional(),
-});
-
 const ChatWithFinancialDataOutputSchema = z.object({
   answer: z.string().describe('The AI-generated answer to the user\'s financial query, based on the provided context.'),
-  sources: z.array(SourceSchema).describe('A list of source document chunks that were used to generate the answer.'),
 });
 
 export type ChatWithFinancialDataOutput = z.infer<typeof ChatWithFinancialDataOutputSchema>;

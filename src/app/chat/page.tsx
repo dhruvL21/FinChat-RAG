@@ -23,6 +23,7 @@ interface ChatMessage {
 }
 
 export default function ChatPage() {
+  const [mounted, setMounted] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     { 
@@ -32,6 +33,10 @@ export default function ChatPage() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -63,6 +68,8 @@ export default function ChatPage() {
     }
   };
 
+  if (!mounted) return null;
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -72,7 +79,10 @@ export default function ChatPage() {
             <MessageSquare className="w-5 h-5 text-primary" />
             <h2 className="text-lg font-semibold">Financial Chat</h2>
           </div>
-          <Button variant="outline" size="sm" className="gap-2">
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setMessages([{ 
+            role: 'assistant', 
+            content: "Hello! I'm your FinChat Assistant. Ask me anything about your uploaded financial documents, bank statements, or overall spending patterns." 
+          }])}>
             <PlusCircle className="w-4 h-4" />
             New Analysis
           </Button>
@@ -95,14 +105,14 @@ export default function ChatPage() {
               </div>
               
               <div className={cn(
-                "space-y-4",
-                msg.role === 'user' ? "items-end text-right" : "items-start"
+                "space-y-4 max-w-[85%]",
+                msg.role === 'user' ? "flex flex-col items-end" : "flex flex-col items-start"
               )}>
                 <Card className={cn(
-                  "border-none shadow-sm inline-block max-w-[85%]",
+                  "border-none shadow-sm",
                   msg.role === 'user' ? "bg-white text-foreground" : "bg-primary/5 text-foreground"
                 )}>
-                  <CardContent className="p-4 leading-relaxed text-sm">
+                  <CardContent className="p-4 leading-relaxed text-sm whitespace-pre-wrap">
                     {msg.content}
                   </CardContent>
                 </Card>
