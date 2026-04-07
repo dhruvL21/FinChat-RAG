@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,8 +57,6 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      // 1. Retrieve context from Firestore (Simulated Vector Search)
-      // For MVP: Fetch all chunks for this user and pass to LLM
       const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
       const relevantChunks: any[] = [];
       
@@ -79,7 +76,6 @@ export default function ChatPage() {
         });
       }
 
-      // 2. Call Genkit Flow
       const response = await askFinancialQuestion(userMsg, relevantChunks);
       
       setMessages(prev => [...prev, { 
@@ -103,17 +99,20 @@ export default function ChatPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background flex flex-col h-svh overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <MessageSquare className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Financial Chat</h2>
+        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-2">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <div className="flex items-center gap-3 truncate">
+              <MessageSquare className="w-5 h-5 text-primary shrink-0" />
+              <h2 className="text-lg font-semibold truncate">Financial Chat</h2>
+            </div>
           </div>
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => setMessages([{ 
+          <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => setMessages([{ 
             role: 'assistant', 
             content: "Hello! I'm your FinChat Assistant. Ask me anything about your uploaded financial documents, bank statements, or overall spending patterns." 
           }])}>
             <PlusCircle className="w-4 h-4" />
-            New Analysis
+            <span className="hidden sm:inline">New Analysis</span>
           </Button>
         </header>
 
@@ -134,14 +133,14 @@ export default function ChatPage() {
               </div>
               
               <div className={cn(
-                "space-y-4 max-w-[85%]",
+                "space-y-4 max-w-[90%] md:max-w-[85%]",
                 msg.role === 'user' ? "flex flex-col items-end" : "flex flex-col items-start"
               )}>
                 <Card className={cn(
                   "border-none shadow-sm",
                   msg.role === 'user' ? "bg-white text-foreground" : "bg-primary/5 text-foreground"
                 )}>
-                  <CardContent className="p-4 leading-relaxed text-sm whitespace-pre-wrap">
+                  <CardContent className="p-3 md:p-4 leading-relaxed text-sm whitespace-pre-wrap">
                     {msg.content}
                   </CardContent>
                 </Card>
@@ -155,7 +154,7 @@ export default function ChatPage() {
               </div>
               <div className="bg-primary/5 rounded-2xl px-4 py-3 text-sm flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                <span>Analyzing documents and generating insights...</span>
+                <span className="text-xs sm:text-sm">Analyzing data and generating insights...</span>
               </div>
             </div>
           )}
@@ -164,7 +163,7 @@ export default function ChatPage() {
         <div className="p-4 md:p-8 bg-white/50 backdrop-blur-md border-t">
           <div className="max-w-4xl mx-auto relative">
             <Input 
-              placeholder="Ask about your spending, insurance coverage, or tax liability..." 
+              placeholder="Ask about spending, coverage..." 
               className="pr-12 py-6 bg-white shadow-sm border-primary/20 focus-visible:ring-primary"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -180,7 +179,7 @@ export default function ChatPage() {
             </Button>
           </div>
           <p className="text-[10px] text-center mt-3 text-muted-foreground">
-            FinChat AI utilizes your private data context. Analysis is based solely on your uploaded documents.
+            FinChat AI utilizes your private data context. Analysis is based solely on your documents.
           </p>
         </div>
       </SidebarInset>

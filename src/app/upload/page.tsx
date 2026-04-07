@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState } from 'react';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,7 +45,6 @@ export default function UploadPage() {
       reader.onload = async (event) => {
         const content = event.target?.result as string;
         
-        // 1. Create Document record
         const docRef = doc(db, 'users', user.uid, 'documents', docId);
         await setDoc(docRef, {
           id: docId,
@@ -57,7 +55,6 @@ export default function UploadPage() {
           status: 'processing'
         });
 
-        // 2. Process chunks
         const chunks = content.split('\n\n').filter(Boolean);
         
         if (type === 'csv') {
@@ -87,12 +84,11 @@ export default function UploadPage() {
                 transactionDate: date,
                 category: categoryResult?.category || 'Miscellaneous',
                 amount: amount,
-                embeddingVector: [0] // Mock embedding for vector search compatibility
+                embeddingVector: [0]
               });
             }
           }
         } else {
-          // PDF/Text processing
           for (let i = 0; i < chunks.length; i++) {
             const chunkId = Math.random().toString(36).substring(7);
             const chunkRef = doc(db, 'users', user.uid, 'documents', docId, 'chunks', chunkId);
@@ -106,7 +102,6 @@ export default function UploadPage() {
           }
         }
 
-        // 3. Update status to ready
         await setDoc(docRef, { status: 'ready' }, { merge: true });
         
         toast({
@@ -131,22 +126,25 @@ export default function UploadPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-          <h2 className="text-lg font-semibold">Document Management</h2>
+        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-2">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <h2 className="text-lg font-semibold truncate">Documents</h2>
+          </div>
         </header>
 
-        <main className="p-8 max-w-4xl mx-auto w-full space-y-8">
+        <main className="p-4 md:p-8 max-w-4xl mx-auto w-full space-y-8">
           <Card className="border-dashed border-2 border-primary/20 bg-primary/5">
             <CardContent className="flex flex-col items-center justify-center py-12">
               <div className="bg-white p-4 rounded-full shadow-sm mb-4">
                 <FileUp className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="text-lg font-semibold mb-1">Upload Financial Documents</h3>
-              <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm">
-                Drag and drop your bank statements (CSV) or insurance/tax documents (PDF) to start analyzing.
+              <h3 className="text-lg font-semibold mb-1 text-center">Upload Financial Documents</h3>
+              <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm px-4">
+                Drag and drop your bank statements (CSV) or insurance/tax documents (PDF).
               </p>
-              <div className="flex items-center gap-4">
-                <Button className="relative overflow-hidden" disabled={uploading}>
+              <div className="flex flex-col items-center gap-4">
+                <Button className="relative overflow-hidden w-full sm:w-auto" disabled={uploading}>
                   {uploading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   ) : (
@@ -160,13 +158,13 @@ export default function UploadPage() {
                     accept=".csv,.pdf"
                   />
                 </Button>
-                <p className="text-xs text-muted-foreground">Supported: CSV, PDF (Max 10MB)</p>
+                <p className="text-[10px] text-muted-foreground">Supported: CSV, PDF (Max 10MB)</p>
               </div>
             </CardContent>
           </Card>
 
           <div className="space-y-4">
-            <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Recent Documents</h4>
+            <h4 className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Recent Documents</h4>
             {loadingDocs ? (
               <div className="flex justify-center py-12">
                 <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
@@ -175,42 +173,42 @@ export default function UploadPage() {
               <Card className="border-none shadow-sm">
                 <CardContent className="flex flex-col items-center py-12 opacity-50">
                   <FileText className="w-12 h-12 mb-2" />
-                  <p>No documents uploaded yet.</p>
+                  <p className="text-sm">No documents uploaded yet.</p>
                 </CardContent>
               </Card>
             ) : (
               <div className="grid gap-4">
                 {uploadedDocs?.map((file) => (
                   <Card key={file.id} className="border-none shadow-sm">
-                    <CardContent className="p-4 flex items-center justify-between">
+                    <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
-                        <div className="bg-secondary p-2 rounded-lg">
+                        <div className="bg-secondary p-2 rounded-lg shrink-0">
                           {file.fileType === 'CSV' ? (
                             <FileSpreadsheet className="w-5 h-5 text-primary" />
                           ) : (
                             <FileText className="w-5 h-5 text-accent" />
                           )}
                         </div>
-                        <div>
-                          <p className="text-sm font-medium">{file.filename}</p>
-                          <p className="text-xs text-muted-foreground uppercase">{file.fileType}</p>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{file.filename}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">{file.fileType}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
                         {file.status === 'processing' && (
-                          <span className="flex items-center gap-2 text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-full">
+                          <span className="flex items-center gap-2 text-[10px] md:text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-full whitespace-nowrap">
                             <Loader2 className="w-3 h-3 animate-spin" />
                             Indexing...
                           </span>
                         )}
                         {file.status === 'ready' && (
-                          <span className="flex items-center gap-2 text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full">
+                          <span className="flex items-center gap-2 text-[10px] md:text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full whitespace-nowrap">
                             <CheckCircle2 className="w-3 h-3" />
                             Ready
                           </span>
                         )}
                         {file.status === 'failed' && (
-                          <span className="flex items-center gap-2 text-xs text-red-600 font-medium bg-red-50 px-2 py-1 rounded-full">
+                          <span className="flex items-center gap-2 text-[10px] md:text-xs text-red-600 font-medium bg-red-50 px-2 py-1 rounded-full whitespace-nowrap">
                             <AlertCircle className="w-3 h-3" />
                             Failed
                           </span>

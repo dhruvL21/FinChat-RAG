@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
@@ -87,19 +86,23 @@ export default function DashboardPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-          <h2 className="text-lg font-semibold">Overview</h2>
+        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-2">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <h2 className="text-lg font-semibold truncate">Overview</h2>
+          </div>
           <div className="flex items-center gap-4">
-            <div className="bg-secondary px-3 py-1 rounded-full flex items-center gap-2 text-sm font-medium">
-              <Calendar className="w-4 h-4" />
-              <span>Oct 2023 - Mar 2024</span>
+            <div className="bg-secondary px-3 py-1 rounded-full flex items-center gap-2 text-xs md:text-sm font-medium whitespace-nowrap">
+              <Calendar className="w-3 h-3 md:w-4 h-4" />
+              <span className="hidden sm:inline">Oct 2023 - Mar 2024</span>
+              <span className="sm:hidden">Current</span>
             </div>
           </div>
         </header>
 
-        <main className="p-8 space-y-8">
+        <main className="p-4 md:p-8 space-y-8">
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               { title: 'Total Balance', value: '$12,450.00', trend: '+2.5%', icon: Wallet, color: 'text-primary' },
               { title: 'Monthly Spending', value: '$3,820.00', trend: '-10.2%', icon: CreditCard, color: 'text-accent' },
@@ -128,7 +131,7 @@ export default function DashboardPage() {
                 <CardTitle>Spending Trends</CardTitle>
                 <CardDescription>Monthly expenditure across all accounts</CardDescription>
               </CardHeader>
-              <CardContent className="h-[350px]">
+              <CardContent className="h-[300px] md:h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
@@ -173,17 +176,17 @@ export default function DashboardPage() {
                     </div>
                   ) : recentTransactions.length > 0 ? (
                     recentTransactions.map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-primary/10 p-2 rounded-full">
+                      <div key={tx.id} className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="bg-primary/10 p-2 rounded-full shrink-0">
                             <CreditCard className="w-4 h-4 text-primary" />
                           </div>
-                          <div className="overflow-hidden">
-                            <p className="text-sm font-medium truncate max-w-[120px]">{tx.description}</p>
-                            <p className="text-xs text-muted-foreground">{tx.category} • {tx.date}</p>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{tx.description}</p>
+                            <p className="text-xs text-muted-foreground truncate">{tx.category} • {tx.date}</p>
                           </div>
                         </div>
-                        <p className={`text-sm font-bold ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        <p className={`text-sm font-bold shrink-0 ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>
                           {tx.amount < 0 ? '-' : '+'}${Math.abs(tx.amount).toFixed(2)}
                         </p>
                       </div>

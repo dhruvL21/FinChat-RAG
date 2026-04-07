@@ -1,7 +1,6 @@
-
 'use client';
 
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -42,34 +41,37 @@ export default function InsightsPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10">
-          <h2 className="text-lg font-semibold">Financial Insights</h2>
+        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-2">
+          <div className="flex items-center gap-2">
+            <SidebarTrigger />
+            <h2 className="text-lg font-semibold truncate">Financial Insights</h2>
+          </div>
         </header>
 
-        <main className="p-8 space-y-8">
+        <main className="p-4 md:p-8 space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Category Breakdown */}
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm h-full">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="bg-accent/10 p-2 rounded-lg">
+                  <div className="bg-accent/10 p-2 rounded-lg shrink-0">
                     <PieChartIcon className="w-5 h-5 text-accent" />
                   </div>
                   <div>
-                    <CardTitle>Spending by Category</CardTitle>
-                    <CardDescription>Visual distribution of your monthly expenses</CardDescription>
+                    <CardTitle className="text-lg">Spending by Category</CardTitle>
+                    <CardDescription className="text-xs">Visual distribution of monthly expenses</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="h-[350px]">
+              <CardContent className="h-[300px] md:h-[350px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
                       data={categoryData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={80}
-                      outerRadius={120}
+                      innerRadius={60}
+                      outerRadius={100}
                       paddingAngle={5}
                       dataKey="value"
                     >
@@ -78,29 +80,29 @@ export default function InsightsPage() {
                       ))}
                     </Pie>
                     <Tooltip />
-                    <Legend verticalAlign="bottom" height={36}/>
+                    <Legend verticalAlign="bottom" height={36} iconSize={10} wrapperStyle={{ fontSize: '10px' }}/>
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
 
             {/* Overspending Detection */}
-            <Card className="border-none shadow-sm">
+            <Card className="border-none shadow-sm h-full">
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="bg-red-100 p-2 rounded-lg">
+                  <div className="bg-red-100 p-2 rounded-lg shrink-0">
                     <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <CardTitle>Overspending Detection</CardTitle>
-                    <CardDescription>Alerts based on your defined budgets</CardDescription>
+                    <CardTitle className="text-lg">Overspending Alerts</CardTitle>
+                    <CardDescription className="text-xs">Alerts based on defined budgets</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-8">
+              <CardContent className="space-y-6 md:space-y-8">
                 {budgetData.map((item, i) => (
                   <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-xs md:text-sm">
                       <span className="font-medium">{item.name}</span>
                       <span className={cn(
                         "font-bold",
@@ -116,7 +118,7 @@ export default function InsightsPage() {
                     {item.percent > 100 && (
                       <p className="text-[10px] text-red-600 flex items-center gap-1">
                         <TrendingUp className="w-3 h-3" />
-                        You've exceeded your {item.name.toLowerCase()} budget by ${item.spent - item.budget}
+                        Exceeded by ${item.spent - item.budget}
                       </p>
                     )}
                   </div>
@@ -126,40 +128,40 @@ export default function InsightsPage() {
           </div>
 
           {/* Intelligent Tips */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-none bg-primary text-primary-foreground shadow-sm">
-              <CardContent className="p-6">
-                <ShieldCheck className="w-8 h-8 mb-4 opacity-50" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="border-none bg-primary text-primary-foreground shadow-sm flex flex-col">
+              <CardContent className="p-6 flex-1 flex flex-col">
+                <ShieldCheck className="w-8 h-8 mb-4 opacity-50 shrink-0" />
                 <h4 className="font-bold mb-2">Insurance Review</h4>
-                <p className="text-sm opacity-80 leading-relaxed mb-4">
+                <p className="text-xs md:text-sm opacity-80 leading-relaxed mb-6 flex-1">
                   We found a potential coverage gap in your health insurance based on your recent tax filing.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-primary">
+                <Button variant="secondary" size="sm" className="w-full text-primary mt-auto">
                   Review Coverage <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>
-            <Card className="border-none bg-accent text-accent-foreground shadow-sm">
-              <CardContent className="p-6">
-                <TrendingUp className="w-8 h-8 mb-4 opacity-50" />
-                <h4 className="font-bold mb-2">Investment Opportunity</h4>
-                <p className="text-sm opacity-80 leading-relaxed mb-4">
-                  You have a surplus of $1,200 in your checking account. Consider moving it to your high-yield savings.
+            <Card className="border-none bg-accent text-accent-foreground shadow-sm flex flex-col">
+              <CardContent className="p-6 flex-1 flex flex-col">
+                <TrendingUp className="w-8 h-8 mb-4 opacity-50 shrink-0" />
+                <h4 className="font-bold mb-2">Savings Tip</h4>
+                <p className="text-xs md:text-sm opacity-80 leading-relaxed mb-6 flex-1">
+                  You have a surplus in your checking account. Consider moving it to your high-yield savings.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-accent">
+                <Button variant="secondary" size="sm" className="w-full text-accent mt-auto">
                   Transfer Funds <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>
-            <Card className="border-none bg-white shadow-sm">
-              <CardContent className="p-6">
-                <PieChartIcon className="w-8 h-8 mb-4 text-primary opacity-20" />
+            <Card className="border-none bg-white shadow-sm flex flex-col md:col-span-2 lg:col-span-1">
+              <CardContent className="p-6 flex-1 flex flex-col">
+                <PieChartIcon className="w-8 h-8 mb-4 text-primary opacity-20 shrink-0" />
                 <h4 className="font-bold mb-2 text-foreground">Tax Projection</h4>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                  Estimated tax liability for next quarter is $3,400. You are on track based on your income chunks.
+                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-6 flex-1">
+                  Estimated tax liability for next quarter is $3,400 based on your current income trends.
                 </p>
-                <Button variant="outline" size="sm" className="w-full">
-                  View Tax Summary <ArrowRight className="w-4 h-4 ml-2" />
+                <Button variant="outline" size="sm" className="w-full mt-auto">
+                  View Summary <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </CardContent>
             </Card>
