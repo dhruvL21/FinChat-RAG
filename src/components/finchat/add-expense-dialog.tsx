@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -33,16 +33,25 @@ const CATEGORIES = [
 export function AddExpenseDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: '',
     description: '',
     amount: '',
     category: 'Miscellaneous'
   });
+
+  useEffect(() => {
+    setMounted(true);
+    setFormData(prev => ({
+      ...prev,
+      date: new Date().toISOString().split('T')[0]
+    }));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,6 +108,8 @@ export function AddExpenseDialog() {
       setLoading(false);
     }
   };
+
+  if (!mounted) return null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

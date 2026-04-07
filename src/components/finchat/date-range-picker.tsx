@@ -23,14 +23,26 @@ export function DatePickerWithRange({
   className,
   onRangeChange,
 }: DatePickerWithRangeProps) {
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: subMonths(new Date(), 1),
-    to: new Date(),
-  })
+  const [mounted, setMounted] = React.useState(false);
+  const [date, setDate] = React.useState<DateRange | undefined>(undefined);
 
   React.useEffect(() => {
-    onRangeChange(date);
-  }, [date, onRangeChange]);
+    setMounted(true);
+    // Initialize date only on client to avoid hydration mismatch
+    const initialRange = {
+      from: subMonths(new Date(), 1),
+      to: new Date(),
+    };
+    setDate(initialRange);
+    onRangeChange(initialRange);
+  }, []); // Only run once on mount
+
+  // Sync state changes with parent, but only after initial mount
+  React.useEffect(() => {
+    if (mounted) {
+      onRangeChange(date);
+    }
+  }, [date, mounted, onRangeChange]);
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -45,7 +57,7 @@ export function DatePickerWithRange({
             )}
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
+            {mounted && date?.from ? (
               date.to ? (
                 <>
                   {format(date.from, "LLL dd, y")} -{" "}
