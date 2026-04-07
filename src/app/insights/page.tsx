@@ -1,3 +1,4 @@
+
 'use client';
 
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -19,6 +20,7 @@ import {
   Tooltip,
   Legend
 } from 'recharts';
+import { cn } from '@/lib/utils';
 
 const categoryData = [
   { name: 'Rent & EMI', value: 2500, color: '#234EA8' },
