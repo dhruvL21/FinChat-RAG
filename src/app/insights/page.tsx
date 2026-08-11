@@ -1,92 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/finchat/sidebar';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Button } from '@/components/ui/button';
-import { DatePickerWithRange } from '@/components/finchat/date-range-picker';
-import { 
-  PieChart as PieChartIcon, 
-  TrendingUp, 
-  AlertTriangle,
-  ArrowRight,
-  ShieldCheck,
-  Loader2,
-  AlertCircle,
-  Table as TableIcon
-} from 'lucide-react';
-import { 
-  PieChart, 
-  Pie, 
-  Cell, 
-  ResponsiveContainer, 
-  Tooltip,
-  Legend
-} from 'recharts';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { cn, parseCSVLine } from '@/lib/utils';
-import { useFirestore, useUser } from '@/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { DateRange } from 'react-day-picker';
-import type { Transaction } from '@/lib/types';
-
-const COLORS = ['#234EA8', '#6D3DDE', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#6366f1'];
+import { Loader2 } from 'lucide-react';
 
 export default function InsightsPage() {
   const router = useRouter();
-  const { user } = useUser();
-  const db = useFirestore();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
-  const [categoryData, setCategoryData] = useState<{name: string, value: number, color: string}[]>([]);
-  const [budgetData, setBudgetData] = useState<{name: string, spent: number, budget: number, percent: number}[]>([]);
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  useEffect(() => {
+    router.replace('/');
+  }, [router]);
 
-  const loadInsights = useCallback(async () => {
-    if (!user || !db) return;
-    
-    setIsLoading(true);
-    try {
-      const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
-      const catMap: Record<string, number> = {};
-      const allExtractedTransactions: Transaction[] = [];
-      
-      const start = dateRange?.from ? dateRange.from.toISOString().split('T')[0] : null;
-      const end = dateRange?.to ? dateRange.to.toISOString().split('T')[0] : null;
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-primary text-3xl" />
+    </div>
+  );
+}
 
-      for (const docSnap of docsSnapshot.docs) {
-        const chunksSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'));
-        
-        chunksSnapshot.forEach(chunk => {
-          const data = chunk.data();
-          const rawText = data.chunkText || '';
-          const parsed = parseCSVLine(rawText);
-          
-          const amt = (data.amount !== undefined && !isNaN(Number(data.amount)) && Number(data.amount) > 0) 
-            ? Number(data.amount) 
-            : parsed.amount;
-
-          let desc = parsed.description;
-          if (!desc || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(desc) || desc.startsWith('TXN-')) {
-            const parts = rawText.split(',');
-            desc = parts.find((p: string) => p.trim() && !/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(p.trim()) && !p.trim().startsWith('TXN-'))?.trim() || 'Financial Transaction';
-          }
-
-          const dateStr = (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(data.transactionDate)) 
-            ? data.transactionDate 
-            : parsed.date;
-
+/* 
           allExtractedTransactions.push({
             id: chunk.id,
             date: dateStr,
@@ -393,4 +325,5 @@ export default function InsightsPage() {
       </SidebarInset>
     </SidebarProvider>
   );
-}
+};
+*/

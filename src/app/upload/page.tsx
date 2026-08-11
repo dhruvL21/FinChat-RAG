@@ -15,10 +15,12 @@ import {
   FileSpreadsheet,
   ArrowRight,
   Sparkles,
-  Trash2
+  Trash2,
+  Zap
 } from 'lucide-react';
 import { categorizeExpenses } from '@/ai/flows/categorize-expense-flow';
 import { mapCSVSchema, type CSVSchemaMapping } from '@/ai/flows/map-csv-schema-flow';
+import { hashDocumentContent, getCachedDocument, setCachedDocument } from '@/lib/redis';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection } from '@/firebase';
 import { collection, doc, serverTimestamp, setDoc, deleteDoc, getDocs, writeBatch, query, orderBy } from 'firebase/firestore';
@@ -107,6 +109,42 @@ export default function UploadPage() {
             const headers = headerLine ? headerLine.split(',') : [];
             const dataLines = rawLines.slice(1);
 
+            // 1. Check Redis cache for duplicate document fingerprint
+            setProcessingStatus('⚡ Step 1/3: Checking Redis cache for document fingerprint...');
+            const contentHash = await hashDocumentContent(file.name + content);
+            const cachedDoc = await getCachedDocument(contentHash);
+
+            if (cachedDoc) {
+              setProcessingStatus('⚡ Redis Cache Hit! Instantly importing mapped schema & transactions...');
+              setLastMapping({
+                ...cachedDoc.schemaMapping,
+                explanation: `⚡ [Redis Cache Hit] ${cachedDoc.schemaMapping.explanation}`
+              });
+
+              for (let i = 0; i < cachedDoc.transactions.length; i++) {
+                const tx = cachedDoc.transactions[i];
+                const chunkId = Math.random().toString(36).substring(7);
+                const chunkRef = doc(db, 'users', user.uid, 'documents', docId, 'chunks', chunkId);
+                await setDoc(chunkRef, {
+                  id: chunkId,
+                  documentId: docId,
+                  chunkText: `${tx.date},${tx.description},${tx.amount},${tx.category}`,
+                  chunkOrder: i,
+                  transactionDate: tx.date,
+                  category: tx.category,
+                  amount: tx.amount,
+                  embeddingVector: [0]
+                });
+              }
+
+              await setDoc(docRef, { status: 'ready' }, { merge: true });
+              toast({
+                title: "⚡ Instant Redis Cache Hit",
+                description: `Retrieved schema mapping & transactions for "${file.name}" instantly from Redis cache.`
+              });
+              return;
+            }
+
             setProcessingStatus('🔍 Step 1/3: OpenAI analyzing CSV structure & mapping column features...');
             const mapping = await mapCSVSchema({ 
               sampleLines: rawLines.slice(0, 6), 
@@ -146,13 +184,22 @@ export default function UploadPage() {
               }
             }
 
-            setProcessingStatus('⚡ Step 3/3: Indexing mapped records into database & populating app...');
+            const finalTransactionsToCache: Array<{ date: string; description: string; amount: number; category: string }> = [];
+
+            setProcessingStatus('⚡ Step 3/3: Indexing mapped records into database & caching in Redis...');
             for (let i = 0; i < parsedTransactions.length; i++) {
               const tx = parsedTransactions[i];
               const categoryResult = results.find(r => r.description === tx.description);
               const finalCategory = (tx.category && tx.category !== 'Miscellaneous') ? tx.category : (categoryResult?.category || 'Miscellaneous');
               const chunkId = Math.random().toString(36).substring(7);
               
+              finalTransactionsToCache.push({
+                date: tx.date,
+                description: tx.description,
+                amount: tx.amount,
+                category: finalCategory
+              });
+
               const chunkRef = doc(db, 'users', user.uid, 'documents', docId, 'chunks', chunkId);
               await setDoc(chunkRef, {
                 id: chunkId,
@@ -165,6 +212,15 @@ export default function UploadPage() {
                 embeddingVector: [0]
               });
             }
+
+            // Save document processing result in Redis cache
+            await setCachedDocument({
+              hash: contentHash,
+              filename: file.name,
+              schemaMapping: mapping,
+              transactions: finalTransactionsToCache,
+              cachedAt: new Date().toISOString()
+            });
           } else {
             setProcessingStatus('⚡ Processing & indexing document chunks...');
             for (let i = 0; i < chunks.length; i++) {
@@ -277,8 +333,17 @@ export default function UploadPage() {
             <Card className="border-none bg-gradient-to-r from-primary/10 via-purple-50 to-primary/5 shadow-sm">
               <CardContent className="p-4 md:p-6 space-y-3">
                 <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                  <Sparkles className="w-4 h-4 text-accent animate-spin" />
-                  <span>OpenAI Feature Schema Mapping Applied</span>
+                  {lastMapping.explanation.includes('Redis Cache Hit') ? (
+                    <>
+                      <Zap className="w-4 h-4 text-amber-500 fill-amber-500 animate-bounce" />
+                      <span className="text-amber-700">⚡ Redis Cache Hit — Instant Document Import</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4 text-accent animate-spin" />
+                      <span>OpenAI Feature Schema Mapping Applied</span>
+                    </>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {lastMapping.explanation}
