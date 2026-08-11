@@ -94,7 +94,7 @@ export default function DashboardPage() {
       if (allExtractedTransactions.length === 0) {
         setRecentTransactions([]);
         setStats({
-          totalBalance: 250000,
+          totalBalance: 0,
           monthlySpending: 0,
           savingsRate: 0,
           projectedTax: 0
@@ -119,12 +119,12 @@ export default function DashboardPage() {
       const totalSpent = activeTransactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
       const totalIncome = activeTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
       
-      const baseBalance = 250000;
+      const calculatedBalance = totalIncome > 0 ? Math.max(0, totalIncome - totalSpent) : Math.max(0, totalSpent);
       setStats({
-        totalBalance: baseBalance + (totalIncome - totalSpent), 
+        totalBalance: calculatedBalance, 
         monthlySpending: totalSpent,
-        savingsRate: (totalIncome + baseBalance) > 0 
-          ? Math.max(0, Math.min(100, Math.round(((totalIncome + baseBalance - totalSpent) / (totalIncome + baseBalance)) * 100))) 
+        savingsRate: totalIncome > 0 
+          ? Math.max(0, Math.min(100, Math.round(((totalIncome - totalSpent) / totalIncome) * 100))) 
           : 0,
         projectedTax: Math.round(totalIncome * 0.15) 
       });
