@@ -30,7 +30,7 @@ import type { Transaction } from '@/lib/types';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { DateRange } from 'react-day-picker';
-import { cn } from '@/lib/utils';
+import { cn, parseCSVLine } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
@@ -47,62 +47,99 @@ export default function DashboardPage() {
   const db = useFirestore();
 
   const loadData = useCallback(async () => {
-    if (!user || !db || !dateRange?.from || !dateRange?.to) return;
+    if (!user || !db) return;
     
     setIsLoading(true);
     try {
       const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
-      const allTransactions: Transaction[] = [];
+      const allExtractedTransactions: Transaction[] = [];
       
-      const start = dateRange.from.toISOString().split('T')[0];
-      const end = dateRange.to.toISOString().split('T')[0];
+      const start = dateRange?.from ? dateRange.from.toISOString().split('T')[0] : null;
+      const end = dateRange?.to ? dateRange.to.toISOString().split('T')[0] : null;
 
       for (const docSnap of docsSnapshot.docs) {
-        const chunksSnapshot = await getDocs(query(
-          collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'),
-          where('transactionDate', '>=', start),
-          where('transactionDate', '<=', end)
-        ));
+        const chunksSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'));
         
         chunksSnapshot.forEach(chunk => {
           const data = chunk.data();
-          if (data.amount !== undefined) {
-            allTransactions.push({
-              id: chunk.id,
-              date: data.transactionDate,
-              description: data.chunkText.split(',')[1]?.trim() || 'Transaction',
-              amount: data.amount,
-              category: data.category || 'Miscellaneous',
-              sourceFile: docSnap.data().filename
-            });
+          const rawText = data.chunkText || '';
+          const parsed = parseCSVLine(rawText);
+          
+          const amt = (data.amount !== undefined && !isNaN(Number(data.amount)) && Number(data.amount) > 0) 
+            ? Number(data.amount) 
+            : parsed.amount;
+
+          // Ensure description is not mistakenly a date or ID
+          let desc = parsed.description;
+          if (!desc || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(desc) || desc.startsWith('TXN-')) {
+            const parts = rawText.split(',');
+            desc = parts.find((p: string) => p.trim() && !/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(p.trim()) && !p.trim().startsWith('TXN-'))?.trim() || 'Financial Transaction';
           }
+
+          const dateStr = (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(data.transactionDate)) 
+            ? data.transactionDate 
+            : parsed.date;
+
+          allExtractedTransactions.push({
+            id: chunk.id,
+            date: dateStr,
+            description: desc,
+            amount: amt,
+            category: data.category && data.category !== 'Miscellaneous' ? data.category : parsed.category,
+            sourceFile: docSnap.data().filename
+          });
         });
       }
-      
-      const sorted = allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      if (allExtractedTransactions.length === 0) {
+        setRecentTransactions([]);
+        setStats({
+          totalBalance: 250000,
+          monthlySpending: 0,
+          savingsRate: 0,
+          projectedTax: 0
+        });
+        setChartData([{ name: 'No Data', spent: 0 }]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Filter by date range if applicable, fallback to all transactions
+      let activeTransactions = allExtractedTransactions;
+      if (start && end) {
+        const matched = allExtractedTransactions.filter(tx => tx.date >= start && tx.date <= end);
+        if (matched.length > 0) {
+          activeTransactions = matched;
+        }
+      }
+
+      const sorted = [...activeTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setRecentTransactions(sorted.slice(0, 10));
 
-      const totalSpent = allTransactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
-      const totalIncome = allTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
+      const totalSpent = activeTransactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
+      const totalIncome = activeTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
       
+      const baseBalance = 250000;
       setStats({
-        totalBalance: 250000 + (totalIncome - totalSpent), 
+        totalBalance: baseBalance + (totalIncome - totalSpent), 
         monthlySpending: totalSpent,
-        savingsRate: totalIncome > 0 ? Math.round(((totalIncome - totalSpent) / totalIncome) * 100) : 0,
-        projectedTax: totalIncome * 0.15 
+        savingsRate: (totalIncome + baseBalance) > 0 
+          ? Math.max(0, Math.min(100, Math.round(((totalIncome + baseBalance - totalSpent) / (totalIncome + baseBalance)) * 100))) 
+          : 0,
+        projectedTax: Math.round(totalIncome * 0.15) 
       });
 
       const monthMap: Record<string, number> = {};
-      allTransactions.forEach(tx => {
-        const month = new Date(tx.date).toLocaleString('default', { month: 'short' });
+      activeTransactions.forEach(tx => {
+        const month = tx.date ? new Date(tx.date).toLocaleString('default', { month: 'short' }) : 'Recent';
         monthMap[month] = (monthMap[month] || 0) + (tx.amount > 0 ? tx.amount : 0);
       });
 
-      const formattedChart = Object.entries(monthMap).map(([name, spent]) => ({ name, spent }));
-      setChartData(formattedChart.length > 0 ? formattedChart : [{ name: 'No Data', spent: 0 }]);
+      const formattedChart = Object.entries(monthMap).map(([name, spent]) => ({ name, spent: Math.round(spent) }));
+      setChartData(formattedChart.length > 0 ? formattedChart : [{ name: 'Total', spent: Math.round(totalSpent) }]);
 
     } catch (err) {
-      console.error(err);
+      console.error("Error loading Overview data:", err);
     } finally {
       setIsLoading(false);
     }

@@ -1,55 +1,47 @@
 'use server';
-/**
- * @fileOverview A Genkit flow for answering natural language questions about financial data.
- *
- * - chatWithFinancialData - A function that handles the financial data querying process.
- */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import OpenAI from 'openai';
+import { z } from 'zod';
 
 const RelevantChunkSchema = z.object({
-  text: z.string().describe('The content of the financial data chunk.'),
+  text: z.string(),
   metadata: z.object({
-    date: z.string().describe('The date associated with the financial entry (e.g., transaction date).'),
-    category: z.string().describe('The categorized type of the financial entry (e.g., food, rent).').optional(),
-    amount: z.number().describe('The monetary amount of the financial entry.').optional(),
-    fileName: z.string().describe('The name of the file from which this chunk was extracted.'),
-  }).describe('Metadata associated with the financial data chunk.'),
+    date: z.string(),
+    category: z.string().optional(),
+    amount: z.number().optional(),
+    fileName: z.string(),
+  }),
 });
 
 const ChatWithFinancialDataInputSchema = z.object({
-  userQuery: z.string().describe('The user\'s natural language question about their financial data.'),
-  relevantChunks: z.array(RelevantChunkSchema).describe('A list of relevant financial data chunks retrieved from the vector store.'),
+  userQuery: z.string(),
+  relevantChunks: z.array(RelevantChunkSchema),
 });
 
 export type ChatWithFinancialDataInput = z.infer<typeof ChatWithFinancialDataInputSchema>;
 
-const ChatWithFinancialDataOutputSchema = z.object({
-  answer: z.string().describe('The AI-generated answer to the user\'s financial query, based on the provided context.'),
-});
+export type ChatWithFinancialDataOutput = {
+  answer: string;
+};
 
-export type ChatWithFinancialDataOutput = z.infer<typeof ChatWithFinancialDataOutputSchema>;
-
-// Internal retry helper to handle 429/RESOURCE_EXHAUSTED errors
-async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
-  try {
-    return await fn();
-  } catch (error: any) {
-    const errorMsg = String(error);
-    if ((errorMsg.includes('429') || errorMsg.includes('RESOURCE_EXHAUSTED')) && retries > 0) {
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return withRetry(fn, retries - 1, delay * 2);
-    }
-    throw error;
+export async function chatWithFinancialData(input: ChatWithFinancialDataInput): Promise<ChatWithFinancialDataOutput> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return {
+      answer: "OPENAI_API_KEY is missing in environment variables. Please add OPENAI_API_KEY to your .env file."
+    };
   }
-}
 
-const chatWithFinancialDataPrompt = ai.definePrompt({
-  name: 'chatWithFinancialDataPrompt',
-  input: {schema: ChatWithFinancialDataInputSchema},
-  output: {schema: ChatWithFinancialDataOutputSchema},
-  prompt: `You are FinChat AI, an Elite Financial Guardian and Strategist. Your mission is to provide rigorous, data-driven analysis of the user's private financial data, always using Indian Rupees (₹) as the currency.
+  const openai = new OpenAI({ apiKey });
+
+  const contextStr = (input.relevantChunks || []).map(chunk => {
+    let details = `[Source: ${chunk.metadata?.fileName || 'Document'}] [Date: ${chunk.metadata?.date || 'Unknown'}]`;
+    if (chunk.metadata?.category) details += ` [Category: ${chunk.metadata.category}]`;
+    if (chunk.metadata?.amount !== undefined) details += ` [Amount: ₹${chunk.metadata.amount}]`;
+    return `${details}\nContent: ${chunk.text}`;
+  }).join('\n---\n');
+
+  const systemPrompt = `You are FinChat AI, an Elite Financial Guardian and Strategist. Your mission is to provide rigorous, data-driven analysis of the user's private financial data, always using Indian Rupees (₹) as the currency.
 
 ### MISSION-CRITICAL OPERATING DIRECTIVES:
 1. **Budget Enforcement:** If the data shows spending in a category is high or has exceeded typical monthly targets, you MUST issue a professional warning.
@@ -59,36 +51,25 @@ const chatWithFinancialDataPrompt = ai.definePrompt({
 2. **Item-Level Scrutiny:** Do not just provide totals. Look into the transaction descriptions (the "items consumed") to find patterns of waste. Identify the "particular items" or vendors that are driving these costs.
 3. **Strategic Absolute:** Your advice must be actionable. If the user is over limit, provide a "Recovery Protocol" to trim expenses in the coming weeks.
 4. **Calculated Accuracy:** Sum all amounts precisely. If a user asks "how much did I spend," provide a hard number calculated from the context in ₹.
-5. **Persona:** You are an expert mentor. Be firm but encouraging. Your goal is the user's financial freedom.
+5. **Persona:** You are an expert mentor. Be firm but encouraging. Your goal is the user's financial freedom.`;
 
-### YOUR SOURCE OF TRUTH (CONTEXT):
-{{#each relevantChunks}}
----
-[Source: {{this.metadata.fileName}}] [Date: {{this.metadata.date}}]
-{{#if this.metadata.category}}Category: {{this.metadata.category}}{{/if}}
-{{#if this.metadata.amount}}Amount: ₹{{this.metadata.amount}}{{/if}}
-Content: {{{this.text}}}
----
-{{/each}}
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `### YOUR SOURCE OF TRUTH (CONTEXT):\n${contextStr || 'No document context found.'}\n\n### USER QUERY:\n${input.userQuery}` }
+      ]
+    });
 
-### USER QUERY:
-{{{userQuery}}}
-
-Provide your guardian-level financial analysis in ₹:`,
-});
-
-const chatWithFinancialDataFlow = ai.defineFlow(
-  {
-    name: 'chatWithFinancialDataFlow',
-    inputSchema: ChatWithFinancialDataInputSchema,
-    outputSchema: ChatWithFinancialDataOutputSchema,
-  },
-  async (input) => {
-    const {output} = await withRetry(() => chatWithFinancialDataPrompt(input));
-    return output!;
+    const answer = response.choices[0]?.message?.content || "I couldn't generate an analysis from the provided data.";
+    return { answer };
+  } catch (error: any) {
+    console.error("OpenAI chat error:", error);
+    return {
+      answer: `An error occurred while calling OpenAI (${error?.message || 'Unknown error'}). Please try again.`
+    };
   }
-);
-
-export async function chatWithFinancialData(input: ChatWithFinancialDataInput): Promise<ChatWithFinancialDataOutput> {
-  return chatWithFinancialDataFlow(input);
 }
+

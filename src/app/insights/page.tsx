@@ -34,7 +34,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
+import { cn, parseCSVLine } from '@/lib/utils';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { DateRange } from 'react-day-picker';
@@ -54,64 +54,120 @@ export default function InsightsPage() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
 
   const loadInsights = useCallback(async () => {
-    if (!user || !db || !dateRange?.from || !dateRange?.to) return;
+    if (!user || !db) return;
     
     setIsLoading(true);
     try {
       const docsSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents'));
       const catMap: Record<string, number> = {};
-      const transactions: Transaction[] = [];
+      const allExtractedTransactions: Transaction[] = [];
       
-      const start = dateRange.from.toISOString().split('T')[0];
-      const end = dateRange.to.toISOString().split('T')[0];
+      const start = dateRange?.from ? dateRange.from.toISOString().split('T')[0] : null;
+      const end = dateRange?.to ? dateRange.to.toISOString().split('T')[0] : null;
 
       for (const docSnap of docsSnapshot.docs) {
-        const chunksSnapshot = await getDocs(query(
-          collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'),
-          where('transactionDate', '>=', start),
-          where('transactionDate', '<=', end)
-        ));
+        const chunksSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'));
         
         chunksSnapshot.forEach(chunk => {
           const data = chunk.data();
-          if (data.amount !== undefined) {
-            const amount = data.amount;
-            if (amount > 0) {
-              const cat = data.category || 'Miscellaneous';
-              catMap[cat] = (catMap[cat] || 0) + amount;
-            }
-            transactions.push({
-              id: chunk.id,
-              date: data.transactionDate,
-              description: data.chunkText.split(',')[1]?.trim() || 'Transaction',
-              amount: data.amount,
-              category: data.category || 'Miscellaneous',
-              sourceFile: docSnap.data().filename
-            });
+          const rawText = data.chunkText || '';
+          const parsed = parseCSVLine(rawText);
+          
+          const amt = (data.amount !== undefined && !isNaN(Number(data.amount)) && Number(data.amount) > 0) 
+            ? Number(data.amount) 
+            : parsed.amount;
+
+          let desc = parsed.description;
+          if (!desc || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(desc) || desc.startsWith('TXN-')) {
+            const parts = rawText.split(',');
+            desc = parts.find((p: string) => p.trim() && !/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(p.trim()) && !p.trim().startsWith('TXN-'))?.trim() || 'Financial Transaction';
           }
+
+          const dateStr = (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(data.transactionDate)) 
+            ? data.transactionDate 
+            : parsed.date;
+
+          allExtractedTransactions.push({
+            id: chunk.id,
+            date: dateStr,
+            description: desc,
+            amount: amt,
+            category: data.category && data.category !== 'Miscellaneous' ? data.category : parsed.category,
+            sourceFile: docSnap.data().filename
+          });
         });
       }
 
-      setAllTransactions(transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      if (allExtractedTransactions.length === 0) {
+        setAllTransactions([]);
+        setCategoryData([]);
+        setBudgetData([]);
+        setIsLoading(false);
+        return;
+      }
 
-      const formattedCat = Object.entries(catMap).map(([name, value], i) => ({
+      let activeTransactions = allExtractedTransactions;
+      if (start && end) {
+        const matched = allExtractedTransactions.filter(tx => tx.date >= start && tx.date <= end);
+        if (matched.length > 0) {
+          activeTransactions = matched;
+        }
+      }
+
+      const categoryAliases: Record<string, string> = {
+        'food': 'Food', 'dining': 'Food', 'groceries': 'Food', 'restaurants': 'Food', 'swiggy': 'Food', 'zomato': 'Food', 'supermarket': 'Food', 'eats': 'Food',
+        'rent': 'Rent', 'housing': 'Rent', 'lease': 'Rent', 'accommodation': 'Rent',
+        'emi': 'EMI', 'loan': 'EMI', 'mortgage': 'EMI', 'debt': 'EMI',
+        'travel': 'Travel', 'transport': 'Travel', 'uber': 'Travel', 'ola': 'Travel', 'fuel': 'Travel', 'cab': 'Travel', 'flight': 'Travel',
+        'shopping': 'Shopping', 'clothing': 'Shopping', 'fashion': 'Shopping', 'amazon': 'Shopping', 'retail': 'Shopping',
+        'utilities': 'Utilities', 'bills': 'Utilities', 'electricity': 'Utilities', 'wifi': 'Utilities', 'mobile': 'Utilities', 'water': 'Utilities', 'recharge': 'Utilities',
+        'healthcare': 'Healthcare', 'medical': 'Healthcare', 'pharmacy': 'Healthcare', 'doctor': 'Healthcare',
+        'education': 'Education', 'tuition': 'Education', 'books': 'Education',
+        'salary': 'Salary', 'income': 'Salary',
+        'investment': 'Investment', 'stocks': 'Investment'
+      };
+
+      const normalizeCategory = (catStr: string): string => {
+        const lower = (catStr || '').trim().toLowerCase();
+        return categoryAliases[lower] || (catStr ? catStr.charAt(0).toUpperCase() + catStr.slice(1) : 'Miscellaneous');
+      };
+
+      const normalizedCatMap: Record<string, number> = {};
+      const normalizedTransactions = activeTransactions.map(tx => {
+        const normCat = normalizeCategory(tx.category || 'Miscellaneous');
+        if (tx.amount > 0) {
+          normalizedCatMap[normCat] = (normalizedCatMap[normCat] || 0) + tx.amount;
+        }
+        return { ...tx, category: normCat };
+      });
+
+      setAllTransactions(normalizedTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+
+      const formattedCat = Object.entries(normalizedCatMap).map(([name, value], i) => ({
         name,
         value: Math.round(value),
         color: COLORS[i % COLORS.length]
       }));
       setCategoryData(formattedCat);
 
-      // Budgets in INR
-      const budgets: Record<string, number> = { 
+      const defaultBudgets: Record<string, number> = { 
         'Food': 15000, 
         'Rent': 45000, 
         'EMI': 25000,
         'Travel': 10000, 
         'Shopping': 8000, 
-        'Utilities': 5000 
+        'Utilities': 5000,
+        'Healthcare': 10000,
+        'Education': 15000,
+        'Investment': 20000,
+        'Miscellaneous': 10000
       };
-      const formattedBudget = Object.entries(budgets).map(([name, budget]) => {
-        const spent = catMap[name] || 0;
+
+      const allBudgetNames = Array.from(new Set([...Object.keys(defaultBudgets), ...Object.keys(normalizedCatMap)]));
+
+      const formattedBudget = allBudgetNames.map((name) => {
+        const spent = normalizedCatMap[name] || 0;
+        const budget = defaultBudgets[name] || 10000;
         return {
           name,
           spent: Math.round(spent),
@@ -119,10 +175,13 @@ export default function InsightsPage() {
           percent: Math.round((spent / budget) * 100)
         };
       });
+
+      // Sort budget guardrails: Categories with active spending appear first!
+      formattedBudget.sort((a, b) => b.spent - a.spent);
       setBudgetData(formattedBudget);
 
     } catch (err) {
-      console.error(err);
+      console.error("Error loading Insights:", err);
     } finally {
       setIsLoading(false);
     }
