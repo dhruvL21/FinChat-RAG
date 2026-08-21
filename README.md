@@ -15,7 +15,7 @@ FinChat AI is a sophisticated financial intelligence platform designed specifica
 ## 🛠️ Tech Stack
 
 - **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
-- **AI Engine**: [Firebase Genkit](https://firebase.google.com/docs/genkit) & Google Gemini 2.5 Flash
+- **AI Engine**: [Firebase Genkit](https://firebase.google.com/docs/genkit) & OpenAI 
 - **Database & Auth**: [Firebase Firestore](https://firebase.google.com/docs/firestore) & [Firebase Authentication](https://firebase.google.com/docs/auth)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) & [Shadcn UI](https://ui.shadcn.com/)
 - **Charts**: [Recharts](https://recharts.org/)
