@@ -19,21 +19,21 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { PlusCircle, Loader2 } from 'lucide-react';
+import { PlusCircle, Loader2, AlertCircle } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { ExpenseInputSchema, AllowedCategories } from '@/lib/validation';
 
-const CATEGORIES = [
-  'Food', 'Rent', 'EMI', 'Travel', 'Utilities', 'Shopping', 
-  'Entertainment', 'Healthcare', 'Education', 'Salary', 
-  'Investment', 'Miscellaneous'
-];
+export interface AddExpenseDialogProps {
+  onExpenseAdded?: () => void;
+}
 
-export function AddExpenseDialog() {
+export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {}) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
@@ -55,14 +55,39 @@ export function AddExpenseDialog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !db || !formData.amount || !formData.description) return;
+    setValidationError(null);
 
+    if (!user || !db) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Required",
+        description: "Please wait for your session to initialize."
+      });
+      return;
+    }
+
+    // 1. Zod Validation
+    const parsedAmount = parseFloat(formData.amount);
+    const validationResult = ExpenseInputSchema.safeParse({
+      date: formData.date,
+      description: formData.description,
+      amount: isNaN(parsedAmount) ? 0 : parsedAmount,
+      category: formData.category
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0]?.message || "Invalid input details provided.";
+      setValidationError(firstError);
+      return;
+    }
+
+    const validatedData = validationResult.data;
     setLoading(true);
     const docId = 'manual_entries';
     const chunkId = Math.random().toString(36).substring(7);
 
     try {
-      // 1. Ensure the parent document exists
+      // 2. Ensure parent document exists
       const docRef = doc(db, 'users', user.uid, 'documents', docId);
       await setDoc(docRef, {
         id: docId,
@@ -73,22 +98,22 @@ export function AddExpenseDialog() {
         status: 'ready'
       }, { merge: true });
 
-      // 2. Add the chunk (transaction)
+      // 3. Add transaction chunk
       const chunkRef = doc(db, 'users', user.uid, 'documents', docId, 'chunks', chunkId);
       await setDoc(chunkRef, {
         id: chunkId,
         documentId: docId,
-        chunkText: `${formData.date}, ${formData.description}, ${formData.amount}`,
+        chunkText: `${validatedData.date}, ${validatedData.description}, ${validatedData.amount}, ${validatedData.category}`,
         chunkOrder: Date.now(),
-        transactionDate: formData.date,
-        category: formData.category,
-        amount: parseFloat(formData.amount),
+        transactionDate: validatedData.date,
+        category: validatedData.category,
+        amount: validatedData.amount,
         embeddingVector: [0]
       });
 
       toast({
         title: "Expense Added",
-        description: `Successfully logged ₹${formData.amount} for ${formData.description}.`
+        description: `Successfully logged ₹${validatedData.amount.toLocaleString('en-IN')} for ${validatedData.description}.`
       });
       setOpen(false);
       setFormData({
@@ -97,12 +122,15 @@ export function AddExpenseDialog() {
         amount: '',
         category: 'Miscellaneous'
       });
+      if (onExpenseAdded) {
+        onExpenseAdded();
+      }
     } catch (error) {
-      console.error(error);
+      console.error("Error saving manual expense:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to save expense. Please try again."
+        title: "Database Error",
+        description: "Failed to save expense. Please check your network and try again."
       });
     } finally {
       setLoading(false);
@@ -112,18 +140,26 @@ export function AddExpenseDialog() {
   if (!mounted) return null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(val) => { setOpen(val); setValidationError(null); }}>
       <DialogTrigger asChild>
-        <Button className="gap-2">
-          <PlusCircle className="w-4 h-4" />
+        <Button className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-blue-600/20 transition-all gap-1.5 shrink-0">
+          <PlusCircle className="w-3.5 h-3.5 text-blue-200" />
           <span>Add Expense</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] rounded-2xl border-slate-200 shadow-2xl">
         <DialogHeader>
-          <DialogTitle>Log New Expense</DialogTitle>
+          <DialogTitle className="text-base font-bold text-slate-900">Log New Rupee Expense</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
+
+        {validationError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-lg flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+            <span>{validationError}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
             <Input 
@@ -166,7 +202,7 @@ export function AddExpenseDialog() {
                 <SelectValue placeholder="Select Category" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map(cat => (
+                {AllowedCategories.map(cat => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                 ))}
               </SelectContent>

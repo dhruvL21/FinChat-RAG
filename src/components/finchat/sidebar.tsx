@@ -89,8 +89,10 @@ export function AppSidebar() {
               const lower = (rawCat || '').trim().toLowerCase();
               const normCat = categoryAliases[lower] || (rawCat ? rawCat.charAt(0).toUpperCase() + rawCat.slice(1) : 'Miscellaneous');
               
-              catMap[normCat] = (catMap[normCat] || 0) + amt;
-              totalSpent += amt;
+              if (normCat !== 'Salary' && normCat !== 'Income') {
+                catMap[normCat] = (catMap[normCat] || 0) + amt;
+                totalSpent += amt;
+              }
             }
           });
         }
@@ -145,70 +147,153 @@ export function AppSidebar() {
   }, [user, db, pathname]);
 
   return (
-    <Sidebar className="border-r-0 shadow-2xl">
-      <SidebarHeader className="p-8">
+    <Sidebar className="border-r border-slate-800/80 bg-[#090d16] text-slate-200 shadow-2xl">
+      {/* Brand Header */}
+      <SidebarHeader className="p-6 border-b border-slate-800/60">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-accent to-primary rounded-xl p-2.5 shadow-lg shadow-accent/20 border border-white/10">
-            <Landmark className="w-6 h-6 text-white" />
+          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-emerald-500 p-0.5 shadow-lg shadow-blue-900/40">
+            <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
+              <Landmark className="w-5 h-5 text-blue-400" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#090d16]" />
           </div>
-          <div>
-            <h1 className="text-xl font-black tracking-tighter text-white leading-none">FinChat AI</h1>
-            <span className="text-[10px] font-black uppercase text-accent tracking-widest mt-1 block">Elite Guardian</span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-base font-extrabold tracking-tight text-white">FinChat AI</h1>
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                PRO
+              </span>
+            </div>
+            <span className="text-[10px] font-semibold text-slate-400 tracking-wider uppercase mt-0.5">
+              Elite Financial Guardian
+            </span>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="px-4 mt-4">
-        <SidebarMenu>
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.href} className="mb-2">
-              <SidebarMenuButton 
-                asChild 
-                isActive={pathname === item.href}
-                className={cn(
-                  "hover:bg-sidebar-accent transition-all duration-300 py-6 rounded-xl",
-                  pathname === item.href ? "bg-sidebar-accent shadow-md scale-[1.02]" : "opacity-70"
-                )}
-              >
-                <Link href={item.href} className="flex items-center gap-4 px-4">
-                  <item.icon className={cn("w-5 h-5", pathname === item.href ? "text-accent" : "")} />
-                  <span className="font-bold tracking-tight text-sm uppercase">{item.name}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+
+      {/* Navigation Links */}
+      <SidebarContent className="px-3 py-4">
+        <div className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+          Navigation
+        </div>
+        <SidebarMenu className="space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={isActive}
+                  className={cn(
+                    "relative flex items-center justify-between py-5 px-3.5 rounded-xl transition-all duration-200 group",
+                    isActive 
+                      ? "bg-gradient-to-r from-blue-600/20 via-blue-600/10 to-transparent text-white border-l-2 border-blue-500 font-semibold shadow-inner" 
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                  )}
+                >
+                  <Link href={item.href} className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <item.icon className={cn(
+                        "w-4 h-4 transition-transform group-hover:scale-110",
+                        isActive ? "text-blue-400" : "text-slate-400 group-hover:text-slate-200"
+                      )} />
+                      <span className="text-xs tracking-tight font-medium">{item.name}</span>
+                    </div>
+
+                    {item.href === '/' && (
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        Live
+                      </span>
+                    )}
+                    {item.href === '/chat' && (
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        AI
+                      </span>
+                    )}
+                    {item.href === '/upload' && (
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        CSV/PDF
+                      </span>
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
+
+        {/* Security & System Info Pill */}
+        <div className="mt-8 px-3">
+          <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] space-y-1.5">
+            <div className="flex items-center justify-between text-slate-400 font-medium">
+              <span>Security Shield</span>
+              <span className="text-emerald-400 font-bold">Encrypted</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-400 font-medium">
+              <span>Currency Base</span>
+              <span className="text-slate-200 font-bold font-mono">INR (₹)</span>
+            </div>
+          </div>
+        </div>
       </SidebarContent>
-      <SidebarFooter className="p-6">
+
+      {/* Footer: Guardian Insight */}
+      <SidebarFooter className="p-4 border-t border-slate-800/60">
         <div className={cn(
-          "rounded-2xl p-5 border backdrop-blur-md transition-all",
-          insightType === 'alert' ? "bg-red-500/15 border-red-500/30" : 
-          insightType === 'healthy' ? "bg-green-500/15 border-green-500/30" : "bg-sidebar-accent/40 border-white/5"
+          "rounded-xl p-4 border backdrop-blur-md transition-all shadow-lg",
+          insightType === 'alert' 
+            ? "bg-rose-950/40 border-rose-500/30 text-rose-200" 
+            : insightType === 'healthy' 
+            ? "bg-emerald-950/40 border-emerald-500/30 text-emerald-200" 
+            : "bg-slate-900/80 border-slate-800 text-slate-300"
         )}>
-          <div className="flex items-center gap-2 mb-3">
-            {insightType === 'alert' ? (
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-            ) : insightType === 'healthy' ? (
-              <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
-            ) : (
-              <TrendingDown className="w-4 h-4 text-accent shrink-0" />
-            )}
-            <span className={cn(
-              "text-[10px] font-black uppercase tracking-widest",
-              insightType === 'alert' ? "text-red-400" : 
-              insightType === 'healthy' ? "text-green-400" : "text-accent"
-            )}>
-              Guardian Insight
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              {insightType === 'alert' ? (
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              ) : insightType === 'healthy' ? (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              ) : (
+                <TrendingDown className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              )}
+              <span className={cn(
+                "text-[10px] font-extrabold uppercase tracking-widest",
+                insightType === 'alert' ? "text-rose-400" : 
+                insightType === 'healthy' ? "text-emerald-400" : "text-blue-400"
+              )}>
+                Guardian Insight
+              </span>
+            </div>
+            <span className="relative flex h-2 w-2">
+              <span className={cn(
+                "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                insightType === 'alert' ? "bg-rose-400" : "bg-emerald-400"
+              )} />
+              <span className={cn(
+                "relative inline-flex rounded-full h-2 w-2",
+                insightType === 'alert' ? "bg-rose-500" : "bg-emerald-500"
+              )} />
             </span>
           </div>
+
           {loadingInsight ? (
-            <div className="flex items-center gap-2 text-sidebar-foreground/60 py-1">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span className="text-[10px]">Analyzing data...</span>
+            <div className="flex items-center gap-2 text-slate-400 py-1">
+              <Loader2 className="w-3 h-3 animate-spin text-blue-400" />
+              <span className="text-[10px]">Analyzing financial logs...</span>
             </div>
           ) : (
-            <p className="text-[11px] text-sidebar-foreground/90 leading-relaxed font-medium italic">
-              {insight}
-            </p>
+            <div>
+              <p className="text-[11px] text-slate-300 leading-relaxed font-normal italic">
+                {insight}
+              </p>
+              <Link 
+                href={`/chat?q=${encodeURIComponent('Analyze the current Guardian Insight alert and recommend actionable steps.')}`}
+                className="mt-2.5 inline-flex items-center gap-1 text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                <span>Consult Guardian AI</span>
+                <span>→</span>
+              </Link>
+            </div>
           )}
         </div>
       </SidebarFooter>

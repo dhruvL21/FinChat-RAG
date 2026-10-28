@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/finchat/sidebar';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { 
@@ -23,14 +21,16 @@ import { mapCSVSchema, type CSVSchemaMapping } from '@/ai/flows/map-csv-schema-f
 import { hashDocumentContent, getCachedDocument, setCachedDocument } from '@/lib/redis';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, useUser, useCollection } from '@/firebase';
-import { collection, doc, serverTimestamp, setDoc, deleteDoc, getDocs, writeBatch, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, writeBatch, query, orderBy } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase/provider';
-import { parseCSVLine } from '@/lib/utils';
+import { parseCSVLine, splitCSVLine } from '@/lib/utils';
+import { FileUploadValidationSchema } from '@/lib/validation';
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [lastMapping, setLastMapping] = useState<CSVSchemaMapping | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useUser();
   const db = useFirestore();
@@ -45,22 +45,17 @@ export default function UploadPage() {
   const handleDeleteDocument = async (docId: string, filename: string) => {
     if (!user || !db) return;
     try {
-      // 1. Fetch chunks subcollection BEFORE deleting parent document
       const chunksRef = collection(db, 'users', user.uid, 'documents', docId, 'chunks');
       const chunksSnapshot = await getDocs(chunksRef);
 
       const batch = writeBatch(db);
-
-      // 2. Add each chunk to batch delete
       chunksSnapshot.docs.forEach(chunkDoc => {
         batch.delete(chunkDoc.ref);
       });
 
-      // 3. Add parent document to batch delete
       const docRef = doc(db, 'users', user.uid, 'documents', docId);
       batch.delete(docRef);
 
-      // 4. Commit atomic batch delete
       await batch.commit();
 
       toast({
@@ -78,13 +73,33 @@ export default function UploadPage() {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUploadError(null);
     const file = e.target.files?.[0];
     if (!file || !user || !db) return;
+
+    // 1. File Input Validation using Zod
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const validationResult = FileUploadValidationSchema.safeParse({
+      filename: file.name,
+      fileSize: file.size,
+      fileType: fileExt === 'csv' ? 'csv' : fileExt === 'pdf' ? 'pdf' : undefined
+    });
+
+    if (!validationResult.success) {
+      const errorMsg = validationResult.error.errors[0]?.message || "Invalid file format or size.";
+      setUploadError(errorMsg);
+      toast({
+        variant: "destructive",
+        title: "File Validation Failed",
+        description: errorMsg
+      });
+      return;
+    }
 
     setUploading(true);
     setProcessingStatus('Initializing document upload...');
     const docId = Math.random().toString(36).substring(7);
-    const type = file.name.endsWith('.csv') ? 'csv' : 'pdf';
+    const type = fileExt === 'csv' ? 'csv' : 'pdf';
 
     try {
       const docRef = doc(db, 'users', user.uid, 'documents', docId);
@@ -105,11 +120,16 @@ export default function UploadPage() {
           
           if (type === 'csv') {
             const rawLines = content.split('\n').filter(l => l.trim());
+            
+            if (rawLines.length === 0) {
+              throw new Error("The uploaded CSV file is empty.");
+            }
+
             const headerLine = rawLines[0];
-            const headers = headerLine ? headerLine.split(',') : [];
+            const headers = headerLine ? splitCSVLine(headerLine) : [];
             const dataLines = rawLines.slice(1);
 
-            // 1. Check Redis cache for duplicate document fingerprint
+            // 1. Redis Cache Lookup for document hash
             setProcessingStatus('⚡ Step 1/3: Checking Redis cache for document fingerprint...');
             const contentHash = await hashDocumentContent(file.name + content);
             const cachedDoc = await getCachedDocument(contentHash);
@@ -145,7 +165,7 @@ export default function UploadPage() {
               return;
             }
 
-            setProcessingStatus('🔍 Step 1/3: OpenAI analyzing CSV structure & mapping column features...');
+            setProcessingStatus('🔍 Step 1/3: AI analyzing CSV structure & mapping column features...');
             const mapping = await mapCSVSchema({ 
               sampleLines: rawLines.slice(0, 6), 
               filename: file.name 
@@ -154,7 +174,7 @@ export default function UploadPage() {
 
             const parsedTransactions = dataLines.map(line => {
               const fallback = parseCSVLine(line, headers);
-              const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g, ''));
+              const parts = splitCSVLine(line);
               
               const rawDate = mapping.dateColumnIndex >= 0 ? parts[mapping.dateColumnIndex] : '';
               const rawDesc = mapping.descriptionColumnIndex >= 0 ? parts[mapping.descriptionColumnIndex] : '';
@@ -171,16 +191,16 @@ export default function UploadPage() {
               };
             });
 
-            setProcessingStatus('🧠 Step 2/3: OpenAI categorizing transactions...');
-            const descriptions = parsedTransactions.map(t => t.description).filter(Boolean);
+            setProcessingStatus('🧠 Step 2/3: AI categorizing transactions...');
+            const uniqueDescriptions = Array.from(new Set(parsedTransactions.map(t => t.description).filter(Boolean))).slice(0, 50);
             
             let results: { description: string, category: string }[] = [];
-            if (descriptions.length > 0) {
+            if (uniqueDescriptions.length > 0) {
               try {
-                const response = await categorizeExpenses({ descriptions });
+                const response = await categorizeExpenses({ descriptions: uniqueDescriptions });
                 results = response?.results || [];
               } catch (catErr) {
-                console.error("Expense categorization failed, using default categories:", catErr);
+                console.warn("Expense categorization fallback triggered:", catErr);
               }
             }
 
@@ -213,7 +233,7 @@ export default function UploadPage() {
               });
             }
 
-            // Save document processing result in Redis cache
+            // Save processing result in Redis cache
             await setCachedDocument({
               hash: contentHash,
               filename: file.name,
@@ -240,15 +260,16 @@ export default function UploadPage() {
           
           toast({
             title: "File Mapped & Processed",
-            description: `${file.name} feature fields mapped by OpenAI and indexed into your app.`
+            description: `${file.name} feature fields mapped by AI and indexed into your app.`
           });
-        } catch (procErr) {
+        } catch (procErr: any) {
           console.error("Error processing document content:", procErr);
           await setDoc(docRef, { status: 'failed' }, { merge: true });
+          setUploadError(procErr?.message || "There was an error parsing your document.");
           toast({
             variant: "destructive",
             title: "Upload Failed",
-            description: "There was an error mapping your document."
+            description: procErr?.message || "There was an error mapping your document."
           });
         } finally {
           setUploading(false);
@@ -259,6 +280,7 @@ export default function UploadPage() {
       reader.onerror = async (err) => {
         console.error("FileReader error:", err);
         await setDoc(docRef, { status: 'failed' }, { merge: true });
+        setUploadError("Failed to read the file contents from disk.");
         toast({
           variant: "destructive",
           title: "Upload Failed",
@@ -268,8 +290,9 @@ export default function UploadPage() {
       };
 
       reader.readAsText(file);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating document record:", error);
+      setUploadError(error?.message || "Error initializing upload.");
       toast({
         variant: "destructive",
         title: "Upload Failed",
@@ -280,28 +303,26 @@ export default function UploadPage() {
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/50 backdrop-blur-sm sticky top-0 z-10 gap-2">
-          <div className="flex items-center gap-2">
-            <SidebarTrigger />
-            <h2 className="text-lg font-semibold truncate">Documents</h2>
-          </div>
-        </header>
+    <main className="p-4 sm:p-6 md:p-8 max-w-4xl mx-auto w-full space-y-8 flex-1">
+        <Card className="border-dashed border-2 border-sky-300 hover:border-blue-500 bg-white/95 backdrop-blur-md rounded-3xl transition-all shadow-[0_12px_28px_-4px_rgba(0,0,0,0.09),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <div className="bg-sky-50 border border-sky-200 p-4 rounded-2xl shadow-[0_4px_10px_-2px_rgba(0,0,0,0.05)] mb-4">
+              <FileUp className="w-8 h-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1 text-center">Upload Financial Documents</h3>
+            <p className="text-xs text-slate-500 mb-6 text-center max-w-sm px-4">
+              Drag and drop your bank statements (CSV) or insurance/tax records (PDF). All records are private and isolated to your user ID.
+            </p>
 
-        <main className="p-4 md:p-8 max-w-4xl mx-auto w-full space-y-8">
-          <Card className="border-dashed border-2 border-primary/20 bg-primary/5">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="bg-white p-4 rounded-full shadow-sm mb-4">
-                <FileUp className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold mb-1 text-center">Upload Financial Documents</h3>
-              <p className="text-sm text-muted-foreground mb-6 text-center max-w-sm px-4">
-                Drag and drop your bank statements (CSV) or insurance/tax documents (PDF).
-              </p>
+              {uploadError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl flex items-center gap-2 mb-4 max-w-md w-full">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
               <div className="flex flex-col items-center gap-4 w-full">
-                <Button className="relative overflow-hidden w-full sm:w-auto" disabled={uploading}>
+                <Button className="relative overflow-hidden w-full sm:w-auto rounded-full bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold shadow-md shadow-blue-500/20 px-6 py-2.5" disabled={uploading}>
                   {uploading ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin text-white" />
                   ) : (
@@ -330,7 +351,7 @@ export default function UploadPage() {
           </Card>
 
           {lastMapping && (
-            <Card className="border-none bg-gradient-to-r from-primary/10 via-purple-50 to-primary/5 shadow-sm">
+            <Card className="border border-slate-200/90 bg-gradient-to-r from-primary/10 via-purple-50 to-primary/5 shadow-[0_10px_24px_-4px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.04)] rounded-2xl">
               <CardContent className="p-4 md:p-6 space-y-3">
                 <div className="flex items-center gap-2 text-primary font-bold text-sm">
                   {lastMapping.explanation.includes('Redis Cache Hit') ? (
@@ -341,7 +362,7 @@ export default function UploadPage() {
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-accent animate-spin" />
-                      <span>OpenAI Feature Schema Mapping Applied</span>
+                      <span>AI Feature Schema Mapping Applied</span>
                     </>
                   )}
                 </div>
@@ -443,8 +464,6 @@ export default function UploadPage() {
               </div>
             )}
           </div>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </main>
   );
 }

@@ -100,6 +100,17 @@ service cloud.firestore {
       }
     }
 
+    /**
+     * @description Rules for user savings goals in Grow My Money.
+     * @path /users/{userId}/savingsGoals/{goalId}
+     */
+    match /users/{userId}/savingsGoals/{goalId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
     // Default deny for any paths not explicitly matched
     match /{document=**} {
       allow read, write: if false;

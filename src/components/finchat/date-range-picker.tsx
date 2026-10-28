@@ -30,19 +30,12 @@ export function DatePickerWithRange({
 
   React.useEffect(() => {
     setMounted(true);
-    const initialRange = {
-      from: subMonths(new Date(), 1),
-      to: new Date(),
-    };
-    setDate(initialRange);
-    onRangeChange(initialRange);
   }, []);
 
-  React.useEffect(() => {
-    if (mounted) {
-      onRangeChange(date);
-    }
-  }, [date, mounted, onRangeChange]);
+  const handleSelect = (newDate: DateRange | undefined) => {
+    setDate(newDate);
+    onRangeChange(newDate);
+  };
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -52,21 +45,21 @@ export function DatePickerWithRange({
             id="date"
             variant={"outline"}
             className={cn(
-              "w-fit min-w-[160px] md:min-w-[280px] justify-start text-left font-normal bg-white/80 border-primary/20 hover:bg-white hover:border-primary/40 transition-all shadow-sm",
-              !date && "text-muted-foreground"
+              "w-fit min-w-[130px] md:min-w-[210px] justify-start text-left font-medium bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs h-9 text-xs rounded-xl",
+              !date && "text-slate-600"
             )}
           >
-            <CalendarIcon className="mr-2 h-4 w-4 text-primary" />
+            <CalendarIcon className="mr-2 h-3.5 w-3.5 text-slate-500 shrink-0" />
             {mounted && date?.from ? (
               date.to ? (
-                <span className="truncate text-xs md:text-sm">
+                <span className="truncate text-xs">
                   {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
                 </span>
               ) : (
-                <span className="text-xs md:text-sm">{format(date.from, "LLL dd, y")}</span>
+                <span className="text-xs">{format(date.from, "LLL dd, y")}</span>
               )
             ) : (
-              <span className="text-xs md:text-sm font-medium">Filter by date</span>
+              <span className="text-xs font-medium">All Time (Filter)</span>
             )}
           </Button>
         </PopoverTrigger>
@@ -74,11 +67,29 @@ export function DatePickerWithRange({
           <Calendar
             initialFocus
             mode="range"
-            defaultMonth={date?.from}
+            defaultMonth={date?.from || new Date()}
             selected={date}
-            onSelect={setDate}
+            onSelect={handleSelect}
             numberOfMonths={isMobile ? 1 : 2}
           />
+          <div className="p-2.5 border-t flex items-center justify-between gap-2 bg-muted/20">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs h-7 text-muted-foreground hover:text-foreground"
+              onClick={() => handleSelect(undefined)}
+            >
+              All Time
+            </Button>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              className="text-xs h-7 font-bold text-primary"
+              onClick={() => handleSelect({ from: subMonths(new Date(), 1), to: new Date() })}
+            >
+              Last 30 Days
+            </Button>
+          </div>
         </PopoverContent>
       </Popover>
     </div>

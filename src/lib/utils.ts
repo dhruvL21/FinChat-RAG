@@ -12,8 +12,37 @@ export interface ParsedTransaction {
   category: string;
 }
 
+/**
+ * Parses a single CSV line properly handling quoted strings containing commas and escaped quotes
+ */
+export function splitCSVLine(text: string): string[] {
+  if (!text) return [];
+  const result: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"' || char === "'") {
+      if (inQuotes && text[i + 1] === char) {
+        cur += char;
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(cur.trim());
+      cur = '';
+    } else {
+      cur += char;
+    }
+  }
+  result.push(cur.trim());
+  return result.map(s => s.replace(/^["']|["']$/g, '').trim());
+}
+
 export function parseCSVLine(line: string, headers?: string[]): ParsedTransaction {
-  const parts = line.split(',').map(p => p.trim().replace(/^["']|["']$/g, ''));
+  const parts = splitCSVLine(line);
 
   let date = '';
   let description = '';

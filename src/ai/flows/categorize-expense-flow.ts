@@ -2,14 +2,13 @@
 
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { AllowedCategories } from '@/lib/validation';
+import { logger } from '@/lib/logger';
 
-const ExpenseCategorySchema = z.enum([
-  'Food', 'Rent', 'EMI', 'Travel', 'Utilities', 'Shopping',
-  'Entertainment', 'Healthcare', 'Education', 'Salary', 'Investment', 'Miscellaneous'
-]);
+const ExpenseCategorySchema = z.enum(AllowedCategories);
 
 const CategorizeExpenseInputSchema = z.object({
-  descriptions: z.array(z.string()),
+  descriptions: z.array(z.string().min(1)).min(1, 'At least one transaction description required'),
 });
 export type CategorizeExpenseInput = z.infer<typeof CategorizeExpenseInputSchema>;
 
@@ -22,9 +21,20 @@ const CategorizeExpenseOutputSchema = z.object({
 export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
 
 export async function categorizeExpenses(input: CategorizeExpenseInput): Promise<CategorizeExpenseOutput> {
+  const startTime = Date.now();
+  logger.info('AIFlow:Categorize', 'Starting expense categorization', { count: input.descriptions?.length || 0 });
+
+  const validation = CategorizeExpenseInputSchema.safeParse(input);
+  if (!validation.success) {
+    logger.warn('AIFlow:Categorize', 'Validation failed for categorization input', { errors: validation.error.errors });
+    return {
+      results: (input.descriptions || []).map(desc => ({ description: desc, category: 'Miscellaneous' }))
+    };
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    console.warn("OPENAI_API_KEY is not set. Falling back to default categories.");
+    logger.warn('AIFlow:Categorize', 'OPENAI_API_KEY is missing. Using default category fallback.');
     return {
       results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
     };
@@ -47,7 +57,7 @@ Return JSON strictly in the format:
   ]
 }
 
-Allowed Categories: 'Food', 'Rent', 'EMI', 'Travel', 'Utilities', 'Shopping', 'Entertainment', 'Healthcare', 'Education', 'Salary', 'Investment', 'Miscellaneous'.
+Allowed Categories: ${AllowedCategories.map(c => `'${c}'`).join(', ')}.
 If a transaction does not fit any specific category, assign it to 'Miscellaneous'.`
         },
         {
@@ -61,19 +71,19 @@ If a transaction does not fit any specific category, assign it to 'Miscellaneous
     if (content) {
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed?.results)) {
+        logger.info('AIFlow:Categorize', 'Expense categorization completed', { durationMs: Date.now() - startTime });
         return parsed as CategorizeExpenseOutput;
       }
     }
 
+    logger.warn('AIFlow:Categorize', 'AI returned non-array result format, using fallback');
     return {
       results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
     };
   } catch (error) {
-    console.error("OpenAI categorization error:", error);
+    logger.error('AIFlow:Categorize', 'OpenAI categorization failed, applying fallback categories', error);
     return {
       results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
     };
   }
 }
-
-

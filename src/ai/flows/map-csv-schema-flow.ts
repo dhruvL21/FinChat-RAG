@@ -2,6 +2,7 @@
 
 import OpenAI from 'openai';
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 const CSVSchemaMappingSchema = z.object({
   dateColumnIndex: z.number().describe('Zero-based column index for the transaction date field, or -1 if missing.'),
@@ -19,17 +20,25 @@ export interface MapCSVSchemaInput {
 }
 
 export async function mapCSVSchema(input: MapCSVSchemaInput): Promise<CSVSchemaMapping> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const startTime = Date.now();
+  logger.info('AIFlow:CSVMap', 'Starting CSV schema mapping', { filename: input.filename, lineCount: input.sampleLines?.length });
 
   const defaultFallback: CSVSchemaMapping = {
     dateColumnIndex: 0,
     descriptionColumnIndex: 1,
     amountColumnIndex: 2,
     categoryColumnIndex: -1,
-    explanation: 'Default fallback index mapping.'
+    explanation: 'Default fallback index mapping (Col 0: Date, Col 1: Description, Col 2: Amount).'
   };
 
-  if (!apiKey || !input.sampleLines || input.sampleLines.length === 0) {
+  if (!input.sampleLines || input.sampleLines.length === 0) {
+    logger.warn('AIFlow:CSVMap', 'Empty CSV sample lines provided, using fallback mapping');
+    return defaultFallback;
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.warn('AIFlow:CSVMap', 'OPENAI_API_KEY missing, using fallback column mapping');
     return defaultFallback;
   }
 
@@ -74,6 +83,13 @@ Return JSON in this format:
     const content = response.choices[0]?.message?.content;
     if (content) {
       const parsed = JSON.parse(content);
+      logger.info('AIFlow:CSVMap', 'CSV schema mapped successfully', {
+        dateCol: parsed.dateColumnIndex,
+        descCol: parsed.descriptionColumnIndex,
+        amtCol: parsed.amountColumnIndex,
+        durationMs: Date.now() - startTime
+      });
+
       return {
         dateColumnIndex: typeof parsed.dateColumnIndex === 'number' ? parsed.dateColumnIndex : 0,
         descriptionColumnIndex: typeof parsed.descriptionColumnIndex === 'number' ? parsed.descriptionColumnIndex : 1,
@@ -85,7 +101,7 @@ Return JSON in this format:
 
     return defaultFallback;
   } catch (error) {
-    console.error("OpenAI schema mapping error:", error);
+    logger.error('AIFlow:CSVMap', 'OpenAI schema mapping error, applying default fallback', error);
     return defaultFallback;
   }
 }

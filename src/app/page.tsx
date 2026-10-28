@@ -3,13 +3,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { AppSidebar } from '@/components/finchat/sidebar';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { AddExpenseDialog } from '@/components/finchat/add-expense-dialog';
 import { DatePickerWithRange } from '@/components/finchat/date-range-picker';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
   ArrowUpRight, 
   Wallet, 
@@ -50,10 +49,10 @@ import type { Transaction } from '@/lib/types';
 import { useFirestore, useUser } from '@/firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { DateRange } from 'react-day-picker';
-import { cn, parseCSVLine } from '@/lib/utils';
+import { cn, parseCSVLine, splitCSVLine } from '@/lib/utils';
 import { EditBudgetDialog } from '@/components/finchat/edit-budget-dialog';
 
-const COLORS = ['#234EA8', '#6D3DDE', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#6366f1'];
+const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#6366f1', '#14b8a6', '#ec4899', '#64748b'];
 
 const DEFAULT_BUDGETS: Record<string, number> = { 
   'Food': 15000, 
@@ -99,6 +98,7 @@ export default function DashboardPage() {
       const end = dateRange?.to ? dateRange.to.toISOString().split('T')[0] : null;
 
       for (const docSnap of docsSnapshot.docs) {
+        if (docSnap.id.startsWith('settings_')) continue;
         const chunksSnapshot = await getDocs(collection(db, 'users', user.uid, 'documents', docSnap.id, 'chunks'));
         
         chunksSnapshot.forEach(chunk => {
@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
           let desc = parsed.description;
           if (!desc || /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(desc) || desc.startsWith('TXN-')) {
-            const parts = rawText.split(',');
+            const parts = splitCSVLine(rawText);
             desc = parts.find((p: string) => p.trim() && !/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(p.trim()) && !p.trim().startsWith('TXN-'))?.trim() || 'Financial Transaction';
           }
 
@@ -149,10 +149,9 @@ export default function DashboardPage() {
 
       let activeTransactions = allExtractedTransactions;
       if (start && end) {
-        const matched = allExtractedTransactions.filter(tx => tx.date >= start && tx.date <= end);
-        if (matched.length > 0) {
-          activeTransactions = matched;
-        }
+        activeTransactions = allExtractedTransactions.filter(tx => tx.date >= start && tx.date <= end);
+      } else if (start) {
+        activeTransactions = allExtractedTransactions.filter(tx => tx.date >= start);
       }
 
       // Category Aliases & Normalization
@@ -177,7 +176,8 @@ export default function DashboardPage() {
       const normalizedCatMap: Record<string, number> = {};
       const normalizedTransactions = activeTransactions.map(tx => {
         const normCat = normalizeCategory(tx.category || 'Miscellaneous');
-        if (tx.amount > 0) {
+        const isIncome = normCat === 'Salary' || normCat === 'Income' || tx.amount < 0;
+        if (tx.amount > 0 && !isIncome) {
           normalizedCatMap[normCat] = (normalizedCatMap[normCat] || 0) + tx.amount;
         }
         return { ...tx, category: normCat };
@@ -187,10 +187,17 @@ export default function DashboardPage() {
       setAllTransactions(sorted);
       setRecentTransactions(sorted.slice(0, 10));
 
-      const totalSpent = normalizedTransactions.reduce((acc, tx) => acc + (tx.amount > 0 ? tx.amount : 0), 0);
-      const totalIncome = normalizedTransactions.reduce((acc, tx) => acc + (tx.amount < 0 ? Math.abs(tx.amount) : 0), 0);
+      const totalSpent = normalizedTransactions.reduce((acc, tx) => {
+        const isIncome = tx.category === 'Salary' || tx.category === 'Income' || tx.amount < 0;
+        return acc + (!isIncome && tx.amount > 0 ? tx.amount : 0);
+      }, 0);
+
+      const totalIncome = normalizedTransactions.reduce((acc, tx) => {
+        const isIncome = tx.category === 'Salary' || tx.category === 'Income' || tx.amount < 0;
+        return acc + (isIncome ? Math.abs(tx.amount) : 0);
+      }, 0);
       
-      const calculatedBalance = totalIncome > 0 ? Math.max(0, totalIncome - totalSpent) : Math.max(0, totalSpent);
+      const calculatedBalance = totalIncome > 0 ? Math.max(0, totalIncome - totalSpent) : 0;
       setStats({
         totalBalance: calculatedBalance, 
         monthlySpending: totalSpent,
@@ -200,11 +207,14 @@ export default function DashboardPage() {
         projectedTax: Math.round(totalIncome * 0.15) 
       });
 
-      // Monthly Chart Data
+      // Monthly Chart Data (Expenditures)
       const monthMap: Record<string, number> = {};
       normalizedTransactions.forEach(tx => {
-        const month = tx.date ? new Date(tx.date).toLocaleString('default', { month: 'short' }) : 'Recent';
-        monthMap[month] = (monthMap[month] || 0) + (tx.amount > 0 ? tx.amount : 0);
+        const isIncome = tx.category === 'Salary' || tx.category === 'Income' || tx.amount < 0;
+        if (!isIncome && tx.amount > 0) {
+          const month = tx.date ? new Date(tx.date).toLocaleString('default', { month: 'short' }) : 'Recent';
+          monthMap[month] = (monthMap[month] || 0) + tx.amount;
+        }
       });
       const formattedChart = Object.entries(monthMap).map(([name, spent]) => ({ name, spent: Math.round(spent) }));
       setChartData(formattedChart.length > 0 ? formattedChart : [{ name: 'Total', spent: Math.round(totalSpent) }]);
@@ -266,40 +276,121 @@ export default function DashboardPage() {
     loadData();
   }, [loadData]);
 
-  return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset className="bg-background">
-        <header className="flex h-16 shrink-0 items-center justify-between px-4 md:px-8 border-b bg-white/80 backdrop-blur-md sticky top-0 z-50 gap-4">
-          <div className="flex items-center gap-2 overflow-hidden">
-            <SidebarTrigger />
-            <h2 className="text-lg font-bold truncate text-primary">Overview & Financial Intelligence</h2>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 justify-end flex-shrink-0">
-            <DatePickerWithRange onRangeChange={setDateRange} />
-            <AddExpenseDialog />
-          </div>
-        </header>
+  const breachedBudget = budgetData.find(b => b.percent > 100);
 
-        <main className="p-4 md:p-8 space-y-8">
+  return (
+    <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 md:p-8 space-y-6 flex-1">
+        
+        {/* Top Control Bar on Main Dashboard */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-3xl glass-card border border-slate-200/90 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.09),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+                Portfolio Health & Intelligence
+              </h1>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/70 px-2.5 py-0.5 rounded-full">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                Guardian Shield Active • INR (₹)
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Live INR (₹) analytics, smart guardrail tracking, and AI anomaly detection.
+            </p>
+          </div>
+
+          {/* Action Controls: Date Range, Add Expense */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <DatePickerWithRange onRangeChange={setDateRange} />
+            <AddExpenseDialog onExpenseAdded={loadData} />
+          </div>
+        </div>
+
+        {/* Guardian Alert Banner (If budget breached) */}
+        {breachedBudget && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-rose-50/90 border border-rose-200/80 shadow-xs animate-in fade-in duration-300">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-100 text-rose-600 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-rose-700">Guardian Insight Alert</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-200/70 text-rose-800">
+                    Budget Breached
+                  </span>
+                </div>
+                <p className="text-xs text-rose-950 font-medium mt-0.5">
+                  Budget limit breached in <strong>'{breachedBudget.name}'</strong> by <strong>₹{(breachedBudget.spent - breachedBudget.budget).toLocaleString('en-IN')}</strong>. Tighten limits to protect your targets.
+                </p>
+              </div>
+            </div>
+            <Button 
+              size="sm" 
+              className="self-start sm:self-auto shrink-0 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-xs gap-1.5"
+              onClick={() => router.push(`/chat?q=${encodeURIComponent(`Analyze the budget breach in '${breachedBudget.name}' by ₹${breachedBudget.spent - breachedBudget.budget} and recommend immediate spending cuts.`)}`)}
+            >
+              <span>Consult Guardian AI</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+
           {/* Top Metrics Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {[
-              { title: 'Total Balance', value: `₹${stats.totalBalance.toLocaleString('en-IN')}`, icon: Wallet, color: 'text-primary' },
-              { title: 'Period Spending', value: `₹${stats.monthlySpending.toLocaleString('en-IN')}`, icon: CreditCard, color: 'text-accent' },
-              { title: 'Savings Rate', value: `${stats.savingsRate}%`, icon: ArrowUpRight, color: 'text-green-600' },
-              { title: 'Projected Tax', value: `₹${stats.projectedTax.toLocaleString('en-IN')}`, icon: DollarSign, color: 'text-orange-600' },
+              { 
+                title: 'Total Balance', 
+                value: `₹${stats.totalBalance.toLocaleString('en-IN')}`, 
+                icon: Wallet, 
+                badge: 'Live Indexed',
+                iconContainer: 'bg-blue-50 text-blue-600 border-blue-100',
+                borderHover: 'hover:border-blue-300'
+              },
+              { 
+                title: 'Period Spending', 
+                value: `₹${stats.monthlySpending.toLocaleString('en-IN')}`, 
+                icon: CreditCard, 
+                badge: 'Period Total',
+                iconContainer: 'bg-rose-50 text-rose-600 border-rose-100',
+                borderHover: 'hover:border-rose-300'
+              },
+              { 
+                title: 'Savings Rate', 
+                value: `${stats.savingsRate}%`, 
+                icon: ArrowUpRight, 
+                badge: stats.savingsRate >= 20 ? 'Target Achieved (≥20%)' : 'Below Target (<20%)',
+                badgePositive: stats.savingsRate >= 20,
+                iconContainer: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+                borderHover: 'hover:border-emerald-300'
+              },
+              { 
+                title: 'Projected Tax', 
+                value: `₹${stats.projectedTax.toLocaleString('en-IN')}`, 
+                icon: DollarSign, 
+                badge: 'FY Reserve Estimate',
+                iconContainer: 'bg-amber-50 text-amber-600 border-amber-100',
+                borderHover: 'hover:border-amber-300'
+              },
             ].map((stat, i) => (
-              <Card key={i} className="border-none shadow-sm hover:shadow-lg transition-all h-full bg-white/60 backdrop-blur-sm">
+              <Card key={i} className={cn("glass-card border border-slate-200/90 rounded-2xl transition-all duration-300 shadow-[0_12px_26px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_32px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1", stat.borderHover)}>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{stat.title}</CardTitle>
-                  <stat.icon className={cn("w-5 h-5", stat.color)} />
+                  <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{stat.title}</CardTitle>
+                  <div className={cn("p-2 rounded-xl border", stat.iconContainer)}>
+                    <stat.icon className="w-4 h-4" />
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl md:text-2xl font-black text-foreground">{stat.value}</div>
-                  <p className="text-[10px] md:text-xs mt-1 text-muted-foreground font-medium">
-                    Live data from indexed statements
-                  </p>
+                  <div className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{stat.value}</div>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-0.5 rounded-md border",
+                      stat.badgePositive !== undefined
+                        ? (stat.badgePositive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200")
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    )}>
+                      {stat.badge}
+                    </span>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -307,28 +398,45 @@ export default function DashboardPage() {
 
           {/* Section 1: Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <Card className="border-none shadow-sm bg-white/60 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-lg font-bold">Spending Trends</CardTitle>
-                <CardDescription>Visual breakdown of periodic expenditure</CardDescription>
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-900">Spending Trends</CardTitle>
+                  <CardDescription className="text-xs text-slate-500">Visual timeline of periodic expenditure (INR)</CardDescription>
+                </div>
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-slate-100 text-slate-700">
+                  Timeline
+                </Badge>
               </CardHeader>
-              <CardContent className="h-[280px] md:h-[350px] pr-0">
+              <CardContent className="h-[280px] md:h-[350px] pr-0 pt-4">
                 {isLoading ? (
-                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ left: -10, right: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 10 }} />
+                    <BarChart data={chartData} margin={{ left: -10, right: 15, top: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11, fontWeight: 500 }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 11 }} />
                       <Tooltip 
-                        cursor={{ fill: '#f3f4f6' }} 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        cursor={{ fill: 'rgba(37, 99, 235, 0.04)' }} 
+                        contentStyle={{ 
+                          backgroundColor: '#ffffff', 
+                          borderRadius: '16px', 
+                          border: '1px solid #bae6fd', 
+                          boxShadow: '0 10px 25px -5px rgba(14, 165, 233, 0.15)',
+                          color: '#0f172a',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }}
+                        itemStyle={{ color: '#0284c7' }}
                         formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Spent']}
                       />
-                      <Bar dataKey="spent" radius={[6, 6, 0, 0]} barSize={40}>
+                      <Bar dataKey="spent" radius={[6, 6, 0, 0]} barSize={38}>
                         {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? 'hsl(var(--accent))' : 'hsl(var(--primary))'} />
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={index === chartData.length - 1 ? '#2563eb' : '#93c5fd'} 
+                          />
                         ))}
                       </Bar>
                     </BarChart>
@@ -337,88 +445,144 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm bg-white/60 backdrop-blur-sm">
-              <CardHeader>
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center gap-3">
-                  <div className="bg-primary/10 p-2 rounded-xl border border-primary/20 shrink-0">
-                    <PieChartIcon className="w-5 h-5 text-primary" />
+                  <div className="bg-blue-50 p-2 rounded-xl border border-blue-100 shrink-0">
+                    <PieChartIcon className="w-4 h-4 text-blue-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-bold">Expense Distribution</CardTitle>
-                    <CardDescription className="text-xs font-medium">Categorized spending patterns</CardDescription>
+                    <CardTitle className="text-base font-bold text-slate-900">Expense Distribution</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Categorized spending patterns</CardDescription>
                   </div>
                 </div>
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-slate-100 text-slate-700">
+                  Breakdown
+                </Badge>
               </CardHeader>
               <CardContent className="h-[280px] md:h-[350px]">
                 {isLoading ? (
-                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>
+                  <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-blue-600" /></div>
                 ) : categoryData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={categoryData}
                         cx="50%"
-                        cy="50%"
-                        innerRadius={65}
-                        outerRadius={100}
+                        cy="48%"
+                        innerRadius={68}
+                        outerRadius={105}
                         paddingAngle={4}
                         dataKey="value"
                       >
                         {categoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
+                          <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="#ffffff" />
                         ))}
                       </Pie>
                       <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} 
+                        contentStyle={{ 
+                          backgroundColor: '#ffffff', 
+                          borderRadius: '16px', 
+                          border: '1px solid #bae6fd', 
+                          boxShadow: '0 10px 25px -5px rgba(14, 165, 233, 0.15)',
+                          color: '#0f172a',
+                          fontSize: '12px',
+                          fontWeight: 600
+                        }} 
                         formatter={(value: number) => [`₹${value.toLocaleString('en-IN')}`, 'Amount']}
                       />
-                      <Legend verticalAlign="bottom" height={36} iconSize={10} wrapperStyle={{ fontSize: '11px', fontWeight: '500' }}/>
+                      <Legend verticalAlign="bottom" height={40} iconSize={9} wrapperStyle={{ fontSize: '11px', fontWeight: '600', color: '#475569' }}/>
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground text-sm text-center px-8 font-medium italic">
-                    No data detected for this period. Upload a CSV to see distribution.
+                  <div className="h-full flex items-center justify-center text-slate-400 text-sm text-center px-8 font-medium italic">
+                    No transactions detected for this period. Upload a bank statement or add an expense.
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
 
-          {/* Section 2: AI Action Cards */}
+          {/* Section 2: AI Action Cards (Executive Luxury Trio) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="border-none bg-primary text-primary-foreground shadow-lg flex flex-col hover:shadow-primary/20 transition-all">
+            {/* Card 1: Limit Analysis */}
+            <Card className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-blue-50/50 to-sky-50 text-slate-900 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:border-blue-300 hover:shadow-[0_18px_34px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1 transition-all duration-300 flex flex-col group">
               <CardContent className="p-6 flex-1 flex flex-col">
-                <ShieldCheck className="w-8 h-8 mb-4 opacity-40 shrink-0" />
-                <h4 className="font-black text-sm uppercase tracking-wider mb-2">Limit Analysis</h4>
-                <p className="text-xs opacity-90 leading-relaxed mb-6 flex-1 font-medium">
-                  Deep-dive into specific items that caused your budget breaches this period.
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2.5 rounded-xl bg-blue-100/70 border border-blue-200 text-blue-600">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
+                    AI Guardian
+                  </span>
+                </div>
+                <h4 className="font-extrabold text-sm tracking-tight mb-2 text-slate-900 group-hover:text-blue-600 transition-colors">
+                  Limit Breach Analysis
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed mb-6 flex-1">
+                  Deep-dive into specific items and transactions that triggered budget alerts this period.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-primary font-bold mt-auto" onClick={() => router.push('/chat?q=Analyze my spending in detail. Which specific items caused budget breaches?')}>
-                  Analyze Items <ArrowRight className="w-4 h-4 ml-2" />
+                <Button 
+                  size="sm" 
+                  className="w-full bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold mt-auto rounded-xl shadow-xs transition-all gap-1.5"
+                  onClick={() => router.push('/chat?q=Analyze my spending in detail. Which specific items caused budget breaches?')}
+                >
+                  <span>Audit Limits</span>
+                  <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                 </Button>
               </CardContent>
             </Card>
-            <Card className="border-none bg-accent text-accent-foreground shadow-lg flex flex-col hover:shadow-accent/20 transition-all">
+
+            {/* Card 2: Leak Detection */}
+            <Card className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-sky-50/50 to-emerald-50/30 text-slate-900 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:border-emerald-300 hover:shadow-[0_18px_34px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1 transition-all duration-300 flex flex-col group">
               <CardContent className="p-6 flex-1 flex flex-col">
-                <TrendingUp className="w-8 h-8 mb-4 opacity-40 shrink-0" />
-                <h4 className="font-black text-sm uppercase tracking-wider mb-2">Leak Detection</h4>
-                <p className="text-xs opacity-90 leading-relaxed mb-6 flex-1 font-medium">
-                  "Miscellaneous" spending is trending up. Find the hidden waste in your logs.
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2.5 rounded-xl bg-emerald-100/70 border border-emerald-200 text-emerald-700">
+                    <TrendingUp className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    Anomaly AI
+                  </span>
+                </div>
+                <h4 className="font-extrabold text-sm tracking-tight mb-2 text-slate-900 group-hover:text-emerald-700 transition-colors">
+                  Spending Leak Detection
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed mb-6 flex-1">
+                  Detect hidden recurring charges, miscellaneous spikes, and unnecessary rupee drains.
                 </p>
-                <Button variant="secondary" size="sm" className="w-full text-accent font-bold mt-auto" onClick={() => router.push('/chat?q=Show me a detailed breakdown of my miscellaneous expenses and identify potential waste.')}>
-                  Find Leaks <ArrowRight className="w-4 h-4 ml-2" />
+                <Button 
+                  size="sm" 
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold mt-auto rounded-xl shadow-xs transition-all gap-1.5"
+                  onClick={() => router.push('/chat?q=Show me a detailed breakdown of my miscellaneous expenses and identify potential waste.')}>
+                  <span>Detect Leaks</span>
+                  <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                 </Button>
               </CardContent>
             </Card>
-            <Card className="border-none bg-white shadow-lg flex flex-col hover:shadow-black/5 transition-all">
-              <CardContent className="p-6 flex-1 flex flex-col border border-muted rounded-lg">
-                <PieChartIcon className="w-8 h-8 mb-4 text-primary opacity-20 shrink-0" />
-                <h4 className="font-black text-sm uppercase tracking-wider mb-2 text-foreground">Recovery Protocol</h4>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-6 flex-1 font-medium">
-                  Exceeded your monthly targets? Generate a strict AI-powered recovery plan.
+
+            {/* Card 3: Recovery Protocol */}
+            <Card className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-sky-50/50 to-indigo-50/30 text-slate-900 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:border-indigo-300 hover:shadow-[0_18px_34px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1 transition-all duration-300 flex flex-col group">
+              <CardContent className="p-6 flex-1 flex flex-col">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2.5 rounded-xl bg-indigo-100/70 border border-indigo-200 text-indigo-700">
+                    <PieChartIcon className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                    Recovery
+                  </span>
+                </div>
+                <h4 className="font-extrabold text-sm tracking-tight mb-2 text-slate-900 group-hover:text-indigo-700 transition-colors">
+                  Budget Recovery Protocol
+                </h4>
+                <p className="text-xs text-slate-600 leading-relaxed mb-6 flex-1">
+                  Exceeded your monthly allowance? Generate a customized AI rebalancing roadmap for next month.
                 </p>
-                <Button variant="outline" size="sm" className="w-full mt-auto font-bold border-primary/20 text-primary" onClick={() => router.push('/chat?q=I exceeded my monthly budget. Create a strict recovery plan for next month.')}>
-                  Get Plan <ArrowRight className="w-4 h-4 ml-2" />
+                <Button 
+                  size="sm" 
+                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold mt-auto rounded-xl shadow-xs transition-all gap-1.5"
+                  onClick={() => router.push('/chat?q=I exceeded my monthly budget. Create a strict recovery plan for next month.')}>
+                  <span>Generate Plan</span>
+                  <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
                 </Button>
               </CardContent>
             </Card>
@@ -426,15 +590,15 @@ export default function DashboardPage() {
 
           {/* Section 3: Guardrails & Activity Log Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <Card className="border-none shadow-sm bg-white/60 backdrop-blur-sm">
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="bg-red-50 p-2 rounded-xl border border-red-100 shrink-0">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <div className="bg-rose-50 p-2 rounded-xl border border-rose-100 shrink-0">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-bold">Budget Guardrail</CardTitle>
-                    <CardDescription className="text-xs font-medium">Real-time limit monitoring (INR)</CardDescription>
+                    <CardTitle className="text-base font-bold text-slate-900">Budget Guardrails</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Real-time category limit monitoring (INR)</CardDescription>
                   </div>
                 </div>
                 <EditBudgetDialog 
@@ -447,80 +611,117 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-5 max-h-[420px] overflow-y-auto pr-2">
                 {isLoading ? (
-                  <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
+                  <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" /></div>
                 ) : budgetData.length > 0 ? (
-                  budgetData.map((item, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="flex justify-between items-end">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-sm text-foreground">{item.name}</span>
-                          <span className="text-muted-foreground text-[10px] font-bold">LIMIT: ₹{item.budget.toLocaleString('en-IN')}</span>
+                  budgetData.map((item, i) => {
+                    const isBreached = item.percent > 100;
+                    const isNearLimit = item.percent >= 75 && !isBreached;
+                    return (
+                      <div key={i} className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/60 space-y-2">
+                        <div className="flex justify-between items-end">
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm text-slate-900">{item.name}</span>
+                              <span className={cn(
+                                "text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded-md",
+                                isBreached 
+                                  ? "bg-rose-100 text-rose-700 border border-rose-200" 
+                                  : isNearLimit
+                                  ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                  : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                              )}>
+                                {isBreached ? 'Breached' : isNearLimit ? 'Near Limit' : 'Safe'}
+                              </span>
+                            </div>
+                            <span className="text-slate-500 text-[10px] font-semibold mt-0.5">
+                              GUARDRAIL LIMIT: ₹{item.budget.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className={cn(
+                              "font-black text-base",
+                              isBreached ? "text-rose-600" : isNearLimit ? "text-amber-600" : "text-emerald-600"
+                            )}>
+                              ₹{item.spent.toLocaleString('en-IN')}
+                            </span>
+                            <span className="text-slate-400 text-[10px] ml-1 font-bold">({item.percent}%)</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className={cn(
-                            "font-black text-base",
-                            item.percent > 100 ? "text-red-600" : "text-green-600"
-                          )}>
-                            ₹{item.spent.toLocaleString('en-IN')}
-                          </span>
-                          <span className="text-muted-foreground text-[10px] ml-1 font-bold">({item.percent}%)</span>
-                        </div>
+
+                        <Progress 
+                          value={Math.min(item.percent, 100)} 
+                          className={cn(
+                            "h-2 rounded-full",
+                            isBreached 
+                              ? "bg-rose-100 [&>div]:bg-rose-500" 
+                              : isNearLimit
+                              ? "bg-amber-100 [&>div]:bg-amber-500"
+                              : "bg-emerald-100 [&>div]:bg-emerald-500"
+                          )} 
+                        />
+
+                        {isBreached && (
+                          <div className="bg-rose-50 border border-rose-200 p-2 rounded-lg flex items-center gap-2">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <p className="text-[10px] text-rose-700 font-bold leading-tight">
+                              Limit exceeded by ₹{(item.spent - item.budget).toLocaleString('en-IN')}. AI guardian recommends review.
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      <Progress value={Math.min(item.percent, 100)} className={cn(
-                        "h-2",
-                        item.percent > 100 ? "bg-red-100 [&>div]:bg-red-500" : "bg-green-100 [&>div]:bg-green-500"
-                      )} />
-                      {item.percent > 100 && (
-                        <div className="bg-red-50 border border-red-100 p-2 rounded-xl flex items-center gap-2 animate-pulse">
-                          <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-                          <p className="text-[10px] text-red-700 font-bold leading-tight">
-                            CRITICAL: Budget breached by ₹{(item.spent - item.budget).toLocaleString('en-IN')}! Ask AI for waste analysis.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm font-medium italic">
+                  <div className="text-center py-8 text-slate-400 text-sm font-medium italic">
                     No budget activity detected.
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm flex flex-col h-full bg-white/60 backdrop-blur-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg font-bold">Activity Log</CardTitle>
-                  <CardDescription>Latest transactions & manual logs</CardDescription>
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] flex flex-col h-full">
+              <CardHeader className="flex flex-row items-center justify-between pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100 shrink-0">
+                    <CreditCard className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-bold text-slate-900">Activity Log</CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Latest transactions & manual logs</CardDescription>
+                  </div>
                 </div>
+                <Badge variant="outline" className="text-[10px] font-semibold text-slate-600 bg-white">
+                  Recent
+                </Badge>
               </CardHeader>
-              <CardContent className="flex-1 overflow-y-auto max-h-[420px]">
-                <div className="space-y-4">
+              <CardContent className="flex-1 overflow-y-auto max-h-[420px] pr-2">
+                <div className="space-y-3">
                   {isLoading ? (
                     <div className="flex justify-center py-12">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary opacity-20" />
+                      <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     </div>
                   ) : recentTransactions.length > 0 ? (
                     recentTransactions.map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between gap-3 border-b border-muted pb-3.5 last:border-0 last:pb-0">
+                      <div key={tx.id} className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/60 flex items-center justify-between gap-3 hover:bg-slate-100/70 transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="bg-primary/5 p-2 rounded-xl shrink-0 border border-primary/10">
-                            <CreditCard className="w-4 h-4 text-primary" />
+                          <div className="bg-white p-2 rounded-lg shrink-0 border border-slate-200/80 shadow-2xs">
+                            <CreditCard className="w-3.5 h-3.5 text-slate-700" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-bold truncate text-foreground">{tx.description}</p>
-                            <p className="text-[10px] md:text-xs text-muted-foreground font-medium truncate">{tx.category} • {tx.date}</p>
+                            <p className="text-xs font-bold truncate text-slate-900">{tx.description}</p>
+                            <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                              <span className="font-semibold text-slate-700">{tx.category}</span> • {tx.date}
+                            </p>
                           </div>
                         </div>
-                        <p className="text-sm font-black shrink-0 text-foreground">
+                        <p className="text-xs font-extrabold shrink-0 text-slate-900">
                           ₹{Math.abs(tx.amount).toLocaleString('en-IN')}
                         </p>
                       </div>
                     ))
                   ) : (
                     <div className="text-center py-12">
-                      <p className="text-sm text-muted-foreground font-medium">No activity in this period.</p>
+                      <p className="text-sm text-slate-400 font-medium italic">No recent transactions recorded.</p>
                     </div>
                   )}
                 </div>
@@ -529,41 +730,46 @@ export default function DashboardPage() {
           </div>
 
           {/* Section 4: Full Transaction Ledger */}
-          <Card className="border-none shadow-sm bg-white/60 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center gap-3">
-              <div className="bg-primary/5 p-2 rounded-xl border border-primary/10">
-                <TableIcon className="w-5 h-5 text-primary" />
+          <Card className="glass-card border border-slate-200/80 rounded-2xl shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-50 p-2 rounded-xl border border-blue-100">
+                  <TableIcon className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-900">Transaction Ledger</CardTitle>
+                  <CardDescription className="text-xs text-slate-500">Detailed log of all financial records in range</CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-lg font-bold">Transaction Ledger</CardTitle>
-                <CardDescription className="text-xs font-medium">Detailed log of all financial records in range</CardDescription>
-              </div>
+              <Badge variant="secondary" className="text-[10px] font-semibold bg-slate-100 text-slate-700">
+                {allTransactions.length} Total Records
+              </Badge>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" /></div>
+                <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" /></div>
               ) : allTransactions.length > 0 ? (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-slate-200/80">
                   <Table>
-                    <TableHeader>
-                      <TableRow className="border-muted">
-                        <TableHead className="text-[10px] font-black uppercase text-muted-foreground">Date</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase text-muted-foreground">Description</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase text-muted-foreground">Category</TableHead>
-                        <TableHead className="text-[10px] font-black uppercase text-muted-foreground text-right">Amount</TableHead>
+                    <TableHeader className="bg-slate-50/80">
+                      <TableRow className="border-slate-200/80">
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Date</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Description</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Category</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600 text-right">Amount (₹)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {allTransactions.map((tx) => (
-                        <TableRow key={tx.id} className="border-muted hover:bg-white/40 transition-colors">
-                          <TableCell className="text-xs font-medium py-3">{tx.date}</TableCell>
-                          <TableCell className="text-xs font-bold py-3 truncate max-w-[220px]">{tx.description}</TableCell>
+                        <TableRow key={tx.id} className="border-slate-200/60 hover:bg-blue-50/30 transition-colors">
+                          <TableCell className="text-xs font-medium py-3 text-slate-600">{tx.date}</TableCell>
+                          <TableCell className="text-xs font-bold py-3 truncate max-w-[220px] text-slate-900">{tx.description}</TableCell>
                           <TableCell className="text-xs py-3">
-                            <span className="bg-primary/5 text-primary px-2 py-1 rounded-md text-[10px] font-bold border border-primary/10">
+                            <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-slate-200">
                               {tx.category}
                             </span>
                           </TableCell>
-                          <TableCell className="text-xs font-black py-3 text-right">
+                          <TableCell className="text-xs font-extrabold py-3 text-right text-slate-900">
                             ₹{Math.abs(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </TableCell>
                         </TableRow>
@@ -572,14 +778,12 @@ export default function DashboardPage() {
                   </Table>
                 </div>
               ) : (
-                <div className="text-center py-12 text-muted-foreground text-sm font-medium italic">
-                  No records found.
+                <div className="text-center py-12 text-slate-400 text-sm font-medium italic">
+                  No records found in this range.
                 </div>
               )}
             </CardContent>
           </Card>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    </main>
   );
 }
