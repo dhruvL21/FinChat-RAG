@@ -2,8 +2,9 @@
 
 import OpenAI from 'openai';
 import { z } from 'zod';
-import { AllowedCategories } from '@/lib/validation';
+import { AllowedCategories, type CategoryType } from '@/lib/validation';
 import { logger } from '@/lib/logger';
+import { detectCategoryFromBusiness } from '@/lib/categorizer';
 
 const ExpenseCategorySchema = z.enum(AllowedCategories);
 
@@ -20,50 +21,76 @@ const CategorizeExpenseOutputSchema = z.object({
 });
 export type CategorizeExpenseOutput = z.infer<typeof CategorizeExpenseOutputSchema>;
 
+/**
+ * Intelligent categorization of financial transaction narrations.
+ * Combines high-speed deterministic merchant & brand matching with
+ * OpenAI gpt-4o-mini reasoning for ambiguous transactions.
+ */
 export async function categorizeExpenses(input: CategorizeExpenseInput): Promise<CategorizeExpenseOutput> {
   const startTime = Date.now();
-  logger.info('AIFlow:Categorize', 'Starting expense categorization', { count: input.descriptions?.length || 0 });
+  const descriptions = input.descriptions || [];
+  logger.info('AIFlow:Categorize', 'Starting expense categorization', { count: descriptions.length });
 
-  const validation = CategorizeExpenseInputSchema.safeParse(input);
-  if (!validation.success) {
-    logger.warn('AIFlow:Categorize', 'Validation failed for categorization input', { errors: validation.error.errors });
+  // 1. Initial pass: Deterministic business & merchant detection
+  const ruleResults = new Map<string, CategoryType>();
+  const ambiguousDescriptions: string[] = [];
+
+  for (const desc of descriptions) {
+    const match = detectCategoryFromBusiness(desc);
+    if (match.confidence === 'high') {
+      ruleResults.set(desc, match.category);
+    } else {
+      ambiguousDescriptions.push(desc);
+    }
+  }
+
+  // If all transactions were decisively identified by business rules, return immediately (<1ms)
+  if (ambiguousDescriptions.length === 0) {
+    logger.info('AIFlow:Categorize', 'All transactions classified via deterministic business rules', {
+      count: descriptions.length,
+      durationMs: Date.now() - startTime
+    });
     return {
-      results: (input.descriptions || []).map(desc => ({ description: desc, category: 'Miscellaneous' }))
+      results: descriptions.map(desc => ({
+        description: desc,
+        category: ruleResults.get(desc) || 'Miscellaneous'
+      }))
     };
   }
 
+  // 2. Secondary pass: Use OpenAI for remaining ambiguous narrations (if API key present)
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    logger.warn('AIFlow:Categorize', 'OPENAI_API_KEY is missing. Using default category fallback.');
     return {
-      results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
+      results: descriptions.map(desc => ({
+        description: desc,
+        category: ruleResults.get(desc) || detectCategoryFromBusiness(desc).category
+      }))
     };
   }
 
-  // 10-second timeout to ensure categorization never freezes the upload UI
-  const openai = new OpenAI({ apiKey, timeout: 10000 });
-
   try {
+    const openai = new OpenAI({ apiKey, timeout: 8000 });
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content: `You are an AI assistant specialized in categorizing financial transactions.
+          content: `You are an AI assistant specialized in categorizing financial transactions based on merchant names, brand names, and banking narrations.
 Return JSON strictly in the format:
 {
   "results": [
-    { "description": "transaction description", "category": "category name" }
+    { "description": "exact description", "category": "category name" }
   ]
 }
 
 Allowed Categories: ${AllowedCategories.map(c => `'${c}'`).join(', ')}.
-If a transaction does not fit any specific category, assign it to 'Miscellaneous'.`
+Assign the most appropriate category based on the business or merchant identity. If completely unidentifiable, assign 'Miscellaneous'.`
         },
         {
           role: 'user',
-          content: `Categorize the following transactions:\n${input.descriptions.map(d => `- ${d}`).join('\n')}`
+          content: `Categorize the following transactions:\n${ambiguousDescriptions.map(d => `- ${d}`).join('\n')}`
         }
       ]
     });
@@ -72,19 +99,31 @@ If a transaction does not fit any specific category, assign it to 'Miscellaneous
     if (content) {
       const parsed = JSON.parse(content);
       if (Array.isArray(parsed?.results)) {
-        logger.info('AIFlow:Categorize', 'Expense categorization completed', { durationMs: Date.now() - startTime });
-        return parsed as CategorizeExpenseOutput;
+        for (const item of parsed.results) {
+          if (item?.description && item?.category && AllowedCategories.includes(item.category)) {
+            ruleResults.set(item.description, item.category);
+          }
+        }
       }
     }
-
-    logger.warn('AIFlow:Categorize', 'AI returned non-array result format, using fallback');
-    return {
-      results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
-    };
   } catch (error) {
-    logger.error('AIFlow:Categorize', 'OpenAI categorization failed or timed out, applying fallback categories', error);
-    return {
-      results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
-    };
+    logger.warn('AIFlow:Categorize', 'OpenAI categorization skipped or timed out, applying merchant rule fallbacks', undefined, error);
   }
+
+  // Assemble final results, ensuring no item is left unclassified
+  const finalResults = descriptions.map(desc => {
+    const existing = ruleResults.get(desc);
+    if (existing && existing !== 'Miscellaneous') {
+      return { description: desc, category: existing };
+    }
+    const detected = detectCategoryFromBusiness(desc);
+    return { description: desc, category: detected.category };
+  });
+
+  logger.info('AIFlow:Categorize', 'Expense categorization completed', {
+    total: descriptions.length,
+    durationMs: Date.now() - startTime
+  });
+
+  return { results: finalResults };
 }

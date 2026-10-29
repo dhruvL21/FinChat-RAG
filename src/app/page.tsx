@@ -52,6 +52,7 @@ import { DateRange } from 'react-day-picker';
 import { cn, parseCSVLine, splitCSVLine } from '@/lib/utils';
 import { EditBudgetDialog } from '@/components/finchat/edit-budget-dialog';
 import { GuardianActionsBox } from '@/components/finchat/guardian-actions-box';
+import { detectCategoryFromBusiness, cleanMerchantName } from '@/lib/categorizer';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#6366f1', '#14b8a6', '#ec4899', '#64748b'];
 
@@ -169,15 +170,28 @@ export default function DashboardPage() {
         'investment': 'Investment', 'stocks': 'Investment'
       };
 
-      const normalizeCategory = (catStr: string): string => {
+      const normalizeCategory = (catStr: string, description?: string, isIncome?: boolean): string => {
         const lower = (catStr || '').trim().toLowerCase();
-        return categoryAliases[lower] || (catStr ? catStr.charAt(0).toUpperCase() + catStr.slice(1) : 'Miscellaneous');
+        if (lower && categoryAliases[lower]) {
+          return categoryAliases[lower];
+        }
+        // If unclassified or generic, automatically detect from business / merchant name
+        if (!catStr || catStr === 'Miscellaneous' || lower === 'expense' || lower === 'debit') {
+          if (description) {
+            const detected = detectCategoryFromBusiness(description, Boolean(isIncome));
+            if (detected.confidence !== 'low') {
+              return detected.category;
+            }
+          }
+        }
+        return (catStr && catStr !== 'Miscellaneous') ? (catStr.charAt(0).toUpperCase() + catStr.slice(1)) : 'Miscellaneous';
       };
 
       const normalizedCatMap: Record<string, number> = {};
       const normalizedTransactions = activeTransactions.map(tx => {
-        const normCat = normalizeCategory(tx.category || 'Miscellaneous');
-        const isIncome = normCat === 'Salary' || normCat === 'Income' || tx.amount < 0;
+        const isIncomeAmount = tx.amount < 0;
+        const normCat = normalizeCategory(tx.category || 'Miscellaneous', tx.description, isIncomeAmount);
+        const isIncome = normCat === 'Salary' || normCat === 'Income' || isIncomeAmount;
         if (tx.amount > 0 && !isIncome) {
           normalizedCatMap[normCat] = (normalizedCatMap[normCat] || 0) + tx.amount;
         }
@@ -628,24 +642,32 @@ export default function DashboardPage() {
                       <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
                     </div>
                   ) : recentTransactions.length > 0 ? (
-                    recentTransactions.map((tx) => (
-                      <div key={tx.id} className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/60 flex items-center justify-between gap-3 hover:bg-slate-100/70 transition-colors">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="bg-white p-2 rounded-lg shrink-0 border border-slate-200/80 shadow-2xs">
-                            <CreditCard className="w-3.5 h-3.5 text-slate-700" />
+                    recentTransactions.map((tx) => {
+                      const merchant = cleanMerchantName(tx.description);
+                      const isCleanDiff = merchant.toLowerCase() !== tx.description.trim().toLowerCase() && tx.description.length > 12;
+                      return (
+                        <div key={tx.id} className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/60 flex items-center justify-between gap-3 hover:bg-slate-100/70 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="bg-white p-2 rounded-lg shrink-0 border border-slate-200/80 shadow-2xs">
+                              <CreditCard className="w-3.5 h-3.5 text-slate-700" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold truncate text-slate-900" title={tx.description}>
+                                {isCleanDiff ? merchant : tx.description}
+                              </p>
+                              <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                                <span className="font-semibold text-slate-700">{tx.category}</span>
+                                {isCleanDiff && <span className="text-slate-400"> • {tx.description}</span>}
+                                <span> • {tx.date}</span>
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold truncate text-slate-900">{tx.description}</p>
-                            <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                              <span className="font-semibold text-slate-700">{tx.category}</span> • {tx.date}
-                            </p>
-                          </div>
+                          <p className="text-xs font-extrabold shrink-0 text-slate-900">
+                            ₹{Math.abs(tx.amount).toLocaleString('en-IN')}
+                          </p>
                         </div>
-                        <p className="text-xs font-extrabold shrink-0 text-slate-900">
-                          ₹{Math.abs(tx.amount).toLocaleString('en-IN')}
-                        </p>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="text-center py-12">
                       <p className="text-sm text-slate-400 font-medium italic">No recent transactions recorded.</p>
@@ -687,20 +709,31 @@ export default function DashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {allTransactions.map((tx) => (
-                        <TableRow key={tx.id} className="border-slate-200/60 hover:bg-blue-50/30 transition-colors">
-                          <TableCell className="text-xs font-medium py-2.5 sm:py-3 text-slate-600 whitespace-nowrap">{tx.date}</TableCell>
-                          <TableCell className="text-xs font-bold py-2.5 sm:py-3 truncate max-w-[180px] sm:max-w-[260px] text-slate-900">{tx.description}</TableCell>
-                          <TableCell className="text-xs py-2.5 sm:py-3">
-                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-200 whitespace-nowrap">
-                              {tx.category}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-xs font-extrabold py-2.5 sm:py-3 text-right text-slate-900 whitespace-nowrap">
-                            ₹{Math.abs(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {allTransactions.map((tx) => {
+                        const merchant = cleanMerchantName(tx.description);
+                        const isCleanDiff = merchant.toLowerCase() !== tx.description.trim().toLowerCase() && tx.description.length > 12;
+                        return (
+                          <TableRow key={tx.id} className="border-slate-200/60 hover:bg-blue-50/30 transition-colors">
+                            <TableCell className="text-xs font-medium py-2.5 sm:py-3 text-slate-600 whitespace-nowrap">{tx.date}</TableCell>
+                            <TableCell className="text-xs font-bold py-2.5 sm:py-3 max-w-[180px] sm:max-w-[260px] text-slate-900" title={tx.description}>
+                              <div className="truncate">
+                                <span>{isCleanDiff ? merchant : tx.description}</span>
+                                {isCleanDiff && (
+                                  <span className="block text-[10px] text-slate-400 font-normal truncate mt-0.5">{tx.description}</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs py-2.5 sm:py-3">
+                              <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-200 whitespace-nowrap">
+                                {tx.category}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-xs font-extrabold py-2.5 sm:py-3 text-right text-slate-900 whitespace-nowrap">
+                              ₹{Math.abs(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>

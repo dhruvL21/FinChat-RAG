@@ -1,4 +1,5 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { detectCategoryFromBusiness } from '@/lib/categorizer';
 import 'pdfjs-dist/legacy/build/pdf.worker.mjs';
 import { logger } from '@/lib/logger';
 
@@ -74,40 +75,13 @@ export function normalizeToISODate(rawDate: string): string {
 }
 
 /**
- * Categorizes bank transaction descriptions into standard Indian spending categories.
+ * Categorizes bank transaction descriptions into standard Indian spending categories
+ * using the intelligent merchant & business detection engine.
  */
 function inferTransactionCategory(description: string, isCredit: boolean): string {
-  if (isCredit) return 'Income';
-  const desc = description.toLowerCase();
-
-  if (/swiggy|zomato|eats|food|restaurant|cafe|bakery|supermarket|grocery|groceries|blinkit|zepto|instamart|dmart|bigbasket/i.test(desc)) {
-    return 'Food';
-  }
-  if (/uber|ola|rapido|metro|irctc|railway|indigo|air india|vistara|flight|fuel|petrol|diesel|hpcl|bpcl|ioc/i.test(desc)) {
-    return 'Travel';
-  }
-  if (/amazon|flipkart|myntra|ajio|zara|h&m|shoppers|croma|reliance|retail|store|mall|shopping/i.test(desc)) {
-    return 'Shopping';
-  }
-  if (/bescom|electricity|power|airtel|jio|vi|broadband|wifi|water|gas|utility|utilities|bill/i.test(desc)) {
-    return 'Utilities';
-  }
-  if (/rent|landlord|housing|society|maintenance|nobroker/i.test(desc)) {
-    return 'Rent';
-  }
-  if (/emi|loan|bajaj finance|hdfc bank loan|icici bank loan|axis loan|kotak loan/i.test(desc)) {
-    return 'EMI';
-  }
-  if (/apollo|pharmacy|medplus|netmeds|1mg|hospital|clinic|doctor|health|dental|lab/i.test(desc)) {
-    return 'Healthcare';
-  }
-  if (/zerodha|groww|upstox|mutual fund|sip|uti|sbi mf|nippon|investment|stocks/i.test(desc)) {
-    return 'Investment';
-  }
-  if (/school|college|university|coursera|udemy|fees|education|tuition/i.test(desc)) {
-    return 'Education';
-  }
-  return 'Miscellaneous';
+  if (isCredit) return 'Salary';
+  const detected = detectCategoryFromBusiness(description, isCredit);
+  return detected.category;
 }
 
 /**

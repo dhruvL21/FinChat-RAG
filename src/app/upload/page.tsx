@@ -32,6 +32,7 @@ import { parseCSVLine, splitCSVLine } from '@/lib/utils';
 import { FileUploadValidationSchema } from '@/lib/validation';
 import { processPdfStatementAction } from '@/app/lib/pdf-actions';
 import { UnlockPdfDialog } from '@/components/finchat/unlock-pdf-dialog';
+import { detectCategoryFromBusiness } from '@/lib/categorizer';
 
 /**
  * Fast client-side SHA-256 hash calculation using Web Crypto API.
@@ -221,7 +222,8 @@ export default function UploadPage() {
         for (let i = 0; i < Math.min(result.detectedTransactions.length, 300); i++) {
           const tx = result.detectedTransactions[i];
           const chunkId = Math.random().toString(36).substring(7);
-          const finalCategory = tx.category || (tx.type === 'credit' ? 'Income' : 'Miscellaneous');
+          const detected = detectCategoryFromBusiness(tx.description, tx.type === 'credit');
+          const finalCategory = (tx.category && tx.category !== 'Miscellaneous') ? tx.category : detected.category;
           chunksToWrite.push({
             id: chunkId,
             documentId: pendingPdfData.docId,
@@ -355,7 +357,8 @@ export default function UploadPage() {
           for (let i = 0; i < Math.min(result.detectedTransactions.length, 300); i++) {
             const tx = result.detectedTransactions[i];
             const chunkId = Math.random().toString(36).substring(7);
-            const finalCategory = tx.category || (tx.type === 'credit' ? 'Income' : 'Miscellaneous');
+            const detected = detectCategoryFromBusiness(tx.description, tx.type === 'credit');
+          const finalCategory = (tx.category && tx.category !== 'Miscellaneous') ? tx.category : detected.category;
             chunksToWrite.push({
               id: chunkId,
               documentId: docId,
@@ -493,7 +496,13 @@ export default function UploadPage() {
           for (let i = 0; i < parsedTransactions.length; i++) {
             const tx = parsedTransactions[i];
             const categoryResult = results.find(r => r.description === tx.description);
-            const finalCategory = (tx.category && tx.category !== 'Miscellaneous') ? tx.category : (categoryResult?.category || 'Miscellaneous');
+            let finalCategory = (tx.category && tx.category !== 'Miscellaneous') ? tx.category : (categoryResult?.category || 'Miscellaneous');
+            if (!finalCategory || finalCategory === 'Miscellaneous') {
+              const detected = detectCategoryFromBusiness(tx.description);
+              if (detected.confidence !== 'low') {
+                finalCategory = detected.category;
+              }
+            }
             const chunkId = Math.random().toString(36).substring(7);
             
             finalTransactionsToCache.push({

@@ -19,11 +19,12 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { PlusCircle, Loader2, AlertCircle } from 'lucide-react';
+import { PlusCircle, Loader2, AlertCircle, Sparkles } from 'lucide-react';
 import { useFirestore, useUser } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { ExpenseInputSchema, AllowedCategories } from '@/lib/validation';
+import { detectCategoryFromBusiness } from '@/lib/categorizer';
 
 export interface AddExpenseDialogProps {
   onExpenseAdded?: () => void;
@@ -34,6 +35,7 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [autoDetected, setAutoDetected] = useState<{ category: string; keyword?: string; confidence: string } | null>(null);
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
@@ -44,6 +46,29 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
     amount: '',
     category: 'Miscellaneous'
   });
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const desc = e.target.value;
+    const detected = detectCategoryFromBusiness(desc);
+    if (detected.confidence !== 'low') {
+      setAutoDetected({
+        category: detected.category,
+        keyword: detected.matchedKeyword,
+        confidence: detected.confidence
+      });
+      setFormData(prev => ({
+        ...prev,
+        description: desc,
+        category: detected.category
+      }));
+    } else {
+      setAutoDetected(null);
+      setFormData(prev => ({
+        ...prev,
+        description: desc
+      }));
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -116,6 +141,7 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
         description: `Successfully logged ₹${validatedData.amount.toLocaleString('en-IN')} for ${validatedData.description}.`
       });
       setOpen(false);
+      setAutoDetected(null);
       setFormData({
         date: new Date().toISOString().split('T')[0],
         description: '',
@@ -140,7 +166,7 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
   if (!mounted) return null;
 
   return (
-    <Dialog open={open} onOpenChange={(val) => { setOpen(val); setValidationError(null); }}>
+    <Dialog open={open} onOpenChange={(val) => { setOpen(val); setValidationError(null); if (!val) setAutoDetected(null); }}>
       <DialogTrigger asChild>
         <Button className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-blue-600/20 transition-all gap-1.5 shrink-0 whitespace-nowrap">
           <PlusCircle className="w-3.5 h-3.5 text-blue-200" />
@@ -174,11 +200,20 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
             <Label htmlFor="desc">Description</Label>
             <Input 
               id="desc" 
-              placeholder="e.g. Weekly Groceries" 
+              placeholder="e.g. Swiggy, Uber, Electricity bill" 
               value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              onChange={handleDescriptionChange}
               required
             />
+            {autoDetected && (
+              <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-semibold bg-blue-50/90 px-2.5 py-1 rounded-md border border-blue-100">
+                <Sparkles className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                <span>
+                  Detected business: <strong className="underline decoration-blue-300">{autoDetected.category}</strong>
+                  {autoDetected.keyword ? ` (matched "${autoDetected.keyword}")` : ''}
+                </span>
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="amount">Amount (₹)</Label>
@@ -196,7 +231,10 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
             <Label htmlFor="category">Category</Label>
             <Select 
               value={formData.category} 
-              onValueChange={(v) => setFormData({...formData, category: v})}
+              onValueChange={(v) => {
+                setFormData({...formData, category: v});
+                setAutoDetected(null);
+              }}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select Category" />

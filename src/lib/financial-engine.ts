@@ -1,4 +1,5 @@
 import type { Transaction, SavingsOpportunity, SavingsGoal } from '@/lib/types';
+import { detectCategoryFromBusiness } from '@/lib/categorizer';
 
 export const DEFAULT_BUDGETS: Record<string, number> = {
   'Food': 15000,
@@ -47,9 +48,27 @@ export const CATEGORY_ALIASES: Record<string, string> = {
   'entertainment': 'Entertainment', 'movies': 'Entertainment', 'netflix': 'Entertainment', 'hotstar': 'Entertainment'
 };
 
-export function normalizeCategory(catStr: string): string {
-  const lower = (catStr || '').trim().toLowerCase();
-  return CATEGORY_ALIASES[lower] || (catStr ? catStr.charAt(0).toUpperCase() + catStr.slice(1) : 'Miscellaneous');
+export function normalizeCategory(catStr: string, description?: string): string {
+  if (!catStr && !description) return 'Miscellaneous';
+  
+  // 1. Direct alias check
+  const lowerCat = (catStr || '').trim().toLowerCase();
+  if (lowerCat && CATEGORY_ALIASES[lowerCat]) {
+    return CATEGORY_ALIASES[lowerCat];
+  }
+
+  // 2. Intelligent business / merchant detection from description or category string
+  const textToInspect = `${catStr || ''} ${description || ''}`.trim();
+  if (textToInspect) {
+    const detected = detectCategoryFromBusiness(textToInspect);
+    if (detected.confidence !== 'low') {
+      return detected.category;
+    }
+  }
+
+  return catStr && catStr !== 'Miscellaneous' 
+    ? catStr.charAt(0).toUpperCase() + catStr.slice(1) 
+    : 'Miscellaneous';
 }
 
 export function formatINR(amount: number): string {

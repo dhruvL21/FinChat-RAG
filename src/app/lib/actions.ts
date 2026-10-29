@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 export async function askFinancialQuestion(
   query: string, 
   context: RelevantChunk[],
+  
   plannerContext?: any
 ) {
   const startTime = Date.now();
