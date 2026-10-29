@@ -7,13 +7,13 @@ import {
   LayoutDashboard, 
   MessageSquare, 
   UploadCloud, 
-  Landmark, 
   TrendingDown,
   Sparkles,
   Loader2,
   AlertTriangle,
   CheckCircle2
 } from 'lucide-react';
+import { FinchatLogo } from '@/components/finchat/finchat-logo';
 import { cn, parseCSVLine } from '@/lib/utils';
 import { 
   Sidebar, 
@@ -151,11 +151,10 @@ export function AppSidebar() {
       {/* Brand Header */}
       <SidebarHeader className="p-6 border-b border-slate-800/60">
         <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-emerald-500 p-0.5 shadow-lg shadow-blue-900/40">
-            <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center">
-              <Landmark className="w-5 h-5 text-blue-400" />
+          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-500 p-0.5 shadow-lg shadow-blue-900/40">
+            <div className="w-full h-full bg-[#090d16] rounded-[10px] flex items-center justify-center overflow-hidden">
+              <FinchatLogo size={40} className="w-full h-full object-cover rounded-[9px]" />
             </div>
-            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-[#090d16]" />
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">

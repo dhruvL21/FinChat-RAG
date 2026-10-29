@@ -59,4 +59,21 @@ export interface GrowMyMoneySettings {
     returnRate?: number;
   };
   updatedAt?: string;
-}
+}
+
+export interface ChatMessage {
+  id?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: string;
+}
+
+export interface ChatSession {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  preview?: string;
+  messages: ChatMessage[];
+}

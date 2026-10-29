@@ -51,6 +51,7 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { DateRange } from 'react-day-picker';
 import { cn, parseCSVLine, splitCSVLine } from '@/lib/utils';
 import { EditBudgetDialog } from '@/components/finchat/edit-budget-dialog';
+import { GuardianActionsBox } from '@/components/finchat/guardian-actions-box';
 
 const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4', '#6366f1', '#14b8a6', '#ec4899', '#64748b'];
 
@@ -279,13 +280,13 @@ export default function DashboardPage() {
   const breachedBudget = budgetData.find(b => b.percent > 100);
 
   return (
-    <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 md:p-8 space-y-6 flex-1">
+    <main className="max-w-7xl mx-auto w-full px-3 py-3 sm:p-6 md:p-8 space-y-4 sm:space-y-6 flex-1">
         
         {/* Top Control Bar on Main Dashboard */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 sm:p-5 rounded-3xl glass-card border border-slate-200/90 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.09),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl glass-card border border-slate-200/90 shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)]">
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+              <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900">
                 Portfolio Health & Intelligence
               </h1>
               <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/70 px-2.5 py-0.5 rounded-full">
@@ -299,7 +300,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Action Controls: Date Range, Add Expense */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <DatePickerWithRange onRangeChange={setDateRange} />
             <AddExpenseDialog onExpenseAdded={loadData} />
           </div>
@@ -307,26 +308,26 @@ export default function DashboardPage() {
 
         {/* Guardian Alert Banner (If budget breached) */}
         {breachedBudget && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl bg-rose-50/90 border border-rose-200/80 shadow-xs animate-in fade-in duration-300">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-rose-100 text-rose-600 shrink-0">
-                <AlertTriangle className="w-5 h-5" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-rose-50/90 border border-rose-200/80 shadow-xs animate-in fade-in duration-300">
+            <div className="flex items-start sm:items-center gap-2.5 sm:gap-3">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-rose-100 text-rose-600 shrink-0 mt-0.5 sm:mt-0">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-black uppercase tracking-wider text-rose-700">Guardian Insight Alert</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-200/70 text-rose-800">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-rose-700">Guardian Insight Alert</span>
+                  <span className="text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full bg-rose-200/70 text-rose-800">
                     Budget Breached
                   </span>
                 </div>
-                <p className="text-xs text-rose-950 font-medium mt-0.5">
+                <p className="text-[11px] sm:text-xs text-rose-950 font-medium mt-0.5">
                   Budget limit breached in <strong>'{breachedBudget.name}'</strong> by <strong>₹{(breachedBudget.spent - breachedBudget.budget).toLocaleString('en-IN')}</strong>. Tighten limits to protect your targets.
                 </p>
               </div>
             </div>
             <Button 
               size="sm" 
-              className="self-start sm:self-auto shrink-0 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-xs gap-1.5"
+              className="w-full sm:w-auto shrink-0 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow-xs gap-1.5 justify-center h-8 sm:h-9"
               onClick={() => router.push(`/chat?q=${encodeURIComponent(`Analyze the budget breach in '${breachedBudget.name}' by ₹${breachedBudget.spent - breachedBudget.budget} and recommend immediate spending cuts.`)}`)}
             >
               <span>Consult Guardian AI</span>
@@ -336,7 +337,7 @@ export default function DashboardPage() {
         )}
 
           {/* Top Metrics Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-6">
             {[
               { 
                 title: 'Total Balance', 
@@ -372,18 +373,18 @@ export default function DashboardPage() {
                 borderHover: 'hover:border-amber-300'
               },
             ].map((stat, i) => (
-              <Card key={i} className={cn("glass-card border border-slate-200/90 rounded-2xl transition-all duration-300 shadow-[0_12px_26px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_32px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1", stat.borderHover)}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{stat.title}</CardTitle>
-                  <div className={cn("p-2 rounded-xl border", stat.iconContainer)}>
-                    <stat.icon className="w-4 h-4" />
+              <Card key={i} className={cn("glass-card border border-slate-200/90 rounded-2xl transition-all duration-300 shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)] hover:shadow-[0_24px_48px_-4px_rgba(0,0,0,0.36)] hover:-translate-y-1", stat.borderHover)}>
+                <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-5 pb-1 sm:pb-2">
+                  <CardTitle className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate mr-1">{stat.title}</CardTitle>
+                  <div className={cn("p-1.5 sm:p-2 rounded-xl border shrink-0", stat.iconContainer)}>
+                    <stat.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">{stat.value}</div>
-                  <div className="flex items-center gap-1.5 mt-2">
+                <CardContent className="p-3 sm:p-5 pt-0 sm:pt-0">
+                  <div className="text-base xs:text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate">{stat.value}</div>
+                  <div className="flex items-center gap-1.5 mt-1 sm:mt-2">
                     <span className={cn(
-                      "text-[10px] font-bold px-2 py-0.5 rounded-md border",
+                      "text-[9px] sm:text-[10px] font-bold px-1.5 sm:px-2 py-0.5 rounded-md border truncate max-w-full",
                       stat.badgePositive !== undefined
                         ? (stat.badgePositive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200")
                         : "bg-slate-100 text-slate-600 border-slate-200"
@@ -398,7 +399,7 @@ export default function DashboardPage() {
 
           {/* Section 1: Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)]">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div>
                   <CardTitle className="text-base font-bold text-slate-900">Spending Trends</CardTitle>
@@ -445,7 +446,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)]">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center gap-3">
                   <div className="bg-blue-50 p-2 rounded-xl border border-blue-100 shrink-0">
@@ -503,94 +504,20 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          {/* Section 2: AI Action Cards (Executive Luxury Trio) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Card 1: Limit Analysis */}
-            <Card className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-blue-50/50 to-sky-50 text-slate-900 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:border-blue-300 hover:shadow-[0_18px_34px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1 transition-all duration-300 flex flex-col group">
-              <CardContent className="p-6 flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2.5 rounded-xl bg-blue-100/70 border border-blue-200 text-blue-600">
-                    <ShieldCheck className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                    AI Guardian
-                  </span>
-                </div>
-                <h4 className="font-extrabold text-sm tracking-tight mb-2 text-slate-900 group-hover:text-blue-600 transition-colors">
-                  Limit Breach Analysis
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed mb-6 flex-1">
-                  Deep-dive into specific items and transactions that triggered budget alerts this period.
-                </p>
-                <Button 
-                  size="sm" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-700 hover:to-sky-700 text-white font-bold mt-auto rounded-xl shadow-xs transition-all gap-1.5"
-                  onClick={() => router.push('/chat?q=Analyze my spending in detail. Which specific items caused budget breaches?')}
-                >
-                  <span>Audit Limits</span>
-                  <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Card 2: Leak Detection */}
-            <Card className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-sky-50/50 to-emerald-50/30 text-slate-900 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:border-emerald-300 hover:shadow-[0_18px_34px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1 transition-all duration-300 flex flex-col group">
-              <CardContent className="p-6 flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2.5 rounded-xl bg-emerald-100/70 border border-emerald-200 text-emerald-700">
-                    <TrendingUp className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
-                    Anomaly AI
-                  </span>
-                </div>
-                <h4 className="font-extrabold text-sm tracking-tight mb-2 text-slate-900 group-hover:text-emerald-700 transition-colors">
-                  Spending Leak Detection
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed mb-6 flex-1">
-                  Detect hidden recurring charges, miscellaneous spikes, and unnecessary rupee drains.
-                </p>
-                <Button 
-                  size="sm" 
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold mt-auto rounded-xl shadow-xs transition-all gap-1.5"
-                  onClick={() => router.push('/chat?q=Show me a detailed breakdown of my miscellaneous expenses and identify potential waste.')}>
-                  <span>Detect Leaks</span>
-                  <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Card 3: Recovery Protocol */}
-            <Card className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-sky-50/50 to-indigo-50/30 text-slate-900 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:border-indigo-300 hover:shadow-[0_18px_34px_-4px_rgba(0,0,0,0.13)] hover:-translate-y-1 transition-all duration-300 flex flex-col group">
-              <CardContent className="p-6 flex-1 flex flex-col">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2.5 rounded-xl bg-indigo-100/70 border border-indigo-200 text-indigo-700">
-                    <PieChartIcon className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
-                    Recovery
-                  </span>
-                </div>
-                <h4 className="font-extrabold text-sm tracking-tight mb-2 text-slate-900 group-hover:text-indigo-700 transition-colors">
-                  Budget Recovery Protocol
-                </h4>
-                <p className="text-xs text-slate-600 leading-relaxed mb-6 flex-1">
-                  Exceeded your monthly allowance? Generate a customized AI rebalancing roadmap for next month.
-                </p>
-                <Button 
-                  size="sm" 
-                  className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-bold mt-auto rounded-xl shadow-xs transition-all gap-1.5"
-                  onClick={() => router.push('/chat?q=I exceeded my monthly budget. Create a strict recovery plan for next month.')}>
-                  <span>Generate Plan</span>
-                  <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Section 2: AI Guardian Actions Box with 3 Options & Inline Output */}
+          <GuardianActionsBox
+            allTransactions={allTransactions}
+            monthlySpending={stats.monthlySpending}
+            totalBalance={stats.totalBalance}
+            savingsRate={stats.savingsRate}
+            breachedBudget={breachedBudget}
+            categoryData={categoryData}
+            customBudgets={customBudgets}
+          />
 
           {/* Section 3: Guardrails & Activity Log Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
-            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)]">
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-rose-50 p-2 rounded-xl border border-rose-100 shrink-0">
@@ -679,7 +606,7 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_12px_28px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] flex flex-col h-full">
+            <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)] flex flex-col h-full">
               <CardHeader className="flex flex-row items-center justify-between pb-4">
                 <div className="flex items-center gap-3">
                   <div className="bg-emerald-50 p-2 rounded-xl border border-emerald-100 shrink-0">
@@ -730,46 +657,46 @@ export default function DashboardPage() {
           </div>
 
           {/* Section 4: Full Transaction Ledger */}
-          <Card className="glass-card border border-slate-200/80 rounded-2xl shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-50 p-2 rounded-xl border border-blue-100">
+          <Card className="glass-card border border-slate-200/90 rounded-2xl shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)]">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-4 sm:p-6">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="bg-blue-50 p-2 rounded-xl border border-blue-100 shrink-0">
                   <TableIcon className="w-4 h-4 text-blue-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-bold text-slate-900">Transaction Ledger</CardTitle>
+                  <CardTitle className="text-sm sm:text-base font-bold text-slate-900">Transaction Ledger</CardTitle>
                   <CardDescription className="text-xs text-slate-500">Detailed log of all financial records in range</CardDescription>
                 </div>
               </div>
-              <Badge variant="secondary" className="text-[10px] font-semibold bg-slate-100 text-slate-700">
+              <Badge variant="secondary" className="self-start sm:self-auto text-[10px] font-semibold bg-slate-100 text-slate-700">
                 {allTransactions.length} Total Records
               </Badge>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
               {isLoading ? (
                 <div className="flex justify-center py-12"><Loader2 className="animate-spin text-blue-600" /></div>
               ) : allTransactions.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-slate-200/80">
-                  <Table>
+                <div className="overflow-x-auto rounded-xl border border-slate-200/80 -mx-1 sm:mx-0">
+                  <Table className="min-w-[480px]">
                     <TableHeader className="bg-slate-50/80">
                       <TableRow className="border-slate-200/80">
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Date</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600 w-24">Date</TableHead>
                         <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Description</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600">Category</TableHead>
-                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600 text-right">Amount (₹)</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600 w-28">Category</TableHead>
+                        <TableHead className="text-[10px] font-bold uppercase tracking-wider text-slate-600 text-right w-28">Amount (₹)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {allTransactions.map((tx) => (
                         <TableRow key={tx.id} className="border-slate-200/60 hover:bg-blue-50/30 transition-colors">
-                          <TableCell className="text-xs font-medium py-3 text-slate-600">{tx.date}</TableCell>
-                          <TableCell className="text-xs font-bold py-3 truncate max-w-[220px] text-slate-900">{tx.description}</TableCell>
-                          <TableCell className="text-xs py-3">
-                            <span className="bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full text-[10px] font-bold border border-slate-200">
+                          <TableCell className="text-xs font-medium py-2.5 sm:py-3 text-slate-600 whitespace-nowrap">{tx.date}</TableCell>
+                          <TableCell className="text-xs font-bold py-2.5 sm:py-3 truncate max-w-[180px] sm:max-w-[260px] text-slate-900">{tx.description}</TableCell>
+                          <TableCell className="text-xs py-2.5 sm:py-3">
+                            <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold border border-slate-200 whitespace-nowrap">
                               {tx.category}
                             </span>
                           </TableCell>
-                          <TableCell className="text-xs font-extrabold py-3 text-right text-slate-900">
+                          <TableCell className="text-xs font-extrabold py-2.5 sm:py-3 text-right text-slate-900 whitespace-nowrap">
                             ₹{Math.abs(tx.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </TableCell>
                         </TableRow>

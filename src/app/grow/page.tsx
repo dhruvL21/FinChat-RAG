@@ -318,13 +318,13 @@ export default function GrowMyMoneyPage() {
   };
 
   return (
-    <main className="max-w-7xl mx-auto w-full p-4 sm:p-6 md:p-8 space-y-7 flex-1">
+    <main className="max-w-7xl mx-auto w-full px-3 py-3 sm:p-6 md:p-8 space-y-5 sm:space-y-7 flex-1">
       
       {/* Page Title & Mission Banner */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-5 rounded-3xl glass-card border border-slate-200/90 shadow-[0_12px_28px_-4px_rgba(0,0,0,0.09),0_4px_10px_-2px_rgba(0,0,0,0.04)]">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4 p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl glass-card border border-slate-200/90 shadow-[0_16px_36px_-4px_rgba(0,0,0,0.25),0_8px_16px_-2px_rgba(0,0,0,0.16),0_2px_6px_rgba(0,0,0,0.10)]">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900">
               Grow My Money
             </h1>
             <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
@@ -338,12 +338,12 @@ export default function GrowMyMoneyPage() {
         </div>
 
         {/* Quick CTA to Ask Finchat AI */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push('/chat?q=How%20much%20can%20I%20realistically%20save%20and%20invest%20every%20month?')}
-            className="text-xs font-semibold gap-1.5 border-sky-200 text-blue-700 hover:bg-sky-50 rounded-2xl h-9"
+            className="w-full sm:w-auto justify-center text-xs font-semibold gap-1.5 border-sky-200 text-blue-700 hover:bg-sky-50 rounded-2xl h-9"
           >
             <Sparkles className="w-3.5 h-3.5 text-blue-600" />
             <span>Consult AI Strategist</span>
@@ -355,7 +355,7 @@ export default function GrowMyMoneyPage() {
           SECTION A: YOUR MONEY (Simple Monthly Savings Planner)
           ========================================================================= */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2">
           <div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 flex items-center gap-2">
               <Wallet className="w-4 h-4 text-blue-600" />
@@ -368,32 +368,31 @@ export default function GrowMyMoneyPage() {
           <IncomeDialog currentIncome={summary.monthlyIncome} onSaveIncome={handleSaveIncome} />
         </div>
 
-        {/* Financial Position Metric Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {/* Financial Position Metric Cards: 2-col on mobile, 5-col on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 sm:gap-3.5">
           
           {/* Monthly Income */}
-          <Card className="glass-card border border-slate-200/90 shadow-[0_10px_22px_-4px_rgba(0,0,0,0.08),0_3px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_28px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all">
-            <CardContent className="p-4 space-y-1">
+          <Card className="glass-card border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all">
+            <CardContent className="p-3 sm:p-4 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Monthly Income
                 </span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900">
-                {summary.hasIncomeData ? formatINR(summary.monthlyIncome) : 'Not Specified'}
+              <div className="text-base xs:text-lg sm:text-2xl font-black text-slate-900 truncate">
+                {summary.hasIncomeData ? formatINR(summary.monthlyIncome) : 'Not Set'}
               </div>
-              <div className="flex items-center justify-between pt-1 text-[11px]">
-                <span className="text-slate-400">
-                  {summary.isIncomeEstimated ? 'No income in docs' : 'Verified / Configured'}
+              <div className="flex items-center justify-between pt-1 text-[10px] sm:text-[11px]">
+                <span className="text-slate-400 truncate">
+                  {summary.isIncomeEstimated ? 'No doc income' : 'Configured'}
                 </span>
                 {!summary.hasIncomeData && (
                   <IncomeDialog
                     currentIncome={summary.monthlyIncome}
                     onSaveIncome={handleSaveIncome}
                     trigger={
-                      <button className="text-blue-600 font-bold hover:underline">
-                        + Set Income
+                      <button className="text-blue-600 font-bold hover:underline shrink-0">
+                        + Set
                       </button>
                     }
                   />
@@ -403,74 +402,71 @@ export default function GrowMyMoneyPage() {
           </Card>
 
           {/* Monthly Expenses */}
-          <Card className="glass-card border border-slate-200/90 shadow-[0_10px_22px_-4px_rgba(0,0,0,0.08),0_3px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_28px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all">
-            <CardContent className="p-4 space-y-1">
+          <Card className="glass-card border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all">
+            <CardContent className="p-3 sm:p-4 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Monthly Expenses
                 </span>
-                <span className="w-2 h-2 rounded-full bg-rose-400"></span>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-rose-600">
+              <div className="text-base xs:text-lg sm:text-2xl font-black text-rose-600 truncate">
                 {formatINR(summary.monthlyExpenses)}
               </div>
-              <p className="text-[11px] text-slate-400 pt-1 truncate">
-                {transactions.length > 0 ? `From ${transactions.length} transactions` : 'No expenses logged'}
+              <p className="text-[10px] sm:text-[11px] text-slate-400 pt-1 truncate">
+                {transactions.length > 0 ? `${transactions.length} records` : 'No expenses'}
               </p>
             </CardContent>
           </Card>
 
           {/* Estimated Monthly Surplus */}
-          <Card className="glass-card border border-slate-200/90 shadow-[0_10px_22px_-4px_rgba(0,0,0,0.08),0_3px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_28px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all">
-            <CardContent className="p-4 space-y-1">
+          <Card className="glass-card border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all">
+            <CardContent className="p-3 sm:p-4 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Monthly Surplus
                 </span>
-                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-blue-700">
+              <div className="text-base xs:text-lg sm:text-2xl font-black text-blue-700 truncate">
                 {formatINR(summary.monthlySurplus)}
               </div>
-              <p className="text-[11px] text-slate-400 pt-1">
-                Income minus expenses
+              <p className="text-[10px] sm:text-[11px] text-slate-400 pt-1 truncate">
+                Income - expenses
               </p>
             </CardContent>
           </Card>
 
           {/* Potential Additional Savings */}
-          <Card className="glass-card border border-slate-200/90 shadow-[0_10px_22px_-4px_rgba(0,0,0,0.08),0_3px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_28px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all bg-sky-50/40">
-            <CardContent className="p-4 space-y-1">
+          <Card className="glass-card border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all bg-sky-50/40">
+            <CardContent className="p-3 sm:p-4 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wider">
-                  Potential Target Cuts
+                  Target Cuts
                 </span>
-                <span className="w-2 h-2 rounded-full bg-sky-400"></span>
               </div>
-              <div className="text-xl sm:text-2xl font-black text-emerald-600">
+              <div className="text-base xs:text-lg sm:text-2xl font-black text-emerald-600 truncate">
                 +{formatINR(potentialAdditionalSavings)}
               </div>
-              <p className="text-[11px] text-slate-500 pt-1">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 pt-1 truncate">
                 {Object.keys(acceptedTargets).length > 0
-                  ? `${Object.keys(acceptedTargets).length} targets accepted`
-                  : '0 targets accepted'}
+                  ? `${Object.keys(acceptedTargets).length} targets`
+                  : '0 targets'}
               </p>
             </CardContent>
           </Card>
 
-          {/* Planned Monthly Savings */}
-          <Card className="glass-card border border-slate-200/90 shadow-[0_10px_22px_-4px_rgba(0,0,0,0.08),0_3px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_16px_28px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all bg-white">
-            <CardContent className="p-4 space-y-1">
+          {/* Planned Monthly Savings (Spans 2 columns on mobile as a highlight card) */}
+          <Card className="col-span-2 lg:col-span-1 glass-card border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all bg-white">
+            <CardContent className="p-3 sm:p-4 space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">
                   Planned Savings
                 </span>
                 <PiggyBank className="w-3.5 h-3.5 text-emerald-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-emerald-700">
+              <div className="text-lg xs:text-xl sm:text-2xl font-black text-emerald-700 truncate">
                 {formatINR(plannedMonthlySavings)}/mo
               </div>
-              <p className="text-[11px] text-emerald-600 font-medium pt-1">
+              <p className="text-[10px] sm:text-[11px] text-emerald-600 font-medium pt-1 truncate">
                 Surplus + targets ({formatINR(plannedMonthlySavings * 12)}/yr)
               </p>
             </CardContent>
@@ -539,7 +535,7 @@ export default function GrowMyMoneyPage() {
               return (
                 <div
                   key={opp.id}
-                  className={`p-4 rounded-3xl border transition-all duration-200 flex flex-col justify-between space-y-3 shadow-[0_10px_24px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_32px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 ${
+                  className={`p-4 rounded-3xl border transition-all duration-200 flex flex-col justify-between space-y-3 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 ${
                     isAccepted
                       ? 'bg-sky-50/80 border-sky-300 ring-1 ring-sky-400/20'
                       : 'bg-white border-slate-200/90'
@@ -640,11 +636,11 @@ export default function GrowMyMoneyPage() {
           </div>
 
           {/* Navigation Toggle between Goals & Investment Explorer */}
-          <div className="flex items-center bg-sky-100/60 p-1 rounded-2xl border border-sky-200/80 w-fit">
+          <div className="flex items-center bg-sky-100/60 p-1 rounded-2xl border border-sky-200/80 w-full sm:w-fit">
             <button
               type="button"
               onClick={() => setActiveTab('goals')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'goals'
                   ? 'bg-white text-blue-700 shadow-2xs'
                   : 'text-slate-600 hover:text-blue-700'
@@ -656,7 +652,7 @@ export default function GrowMyMoneyPage() {
             <button
               type="button"
               onClick={() => setActiveTab('invest')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex-1 sm:flex-none justify-center flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'invest'
                   ? 'bg-white text-blue-700 shadow-2xs'
                   : 'text-slate-600 hover:text-blue-700'
@@ -671,7 +667,7 @@ export default function GrowMyMoneyPage() {
         {/* Tab 1: Savings Goal Planner */}
         {activeTab === 'goals' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-slate-800">Active Savings Goals</h3>
                 <p className="text-[11px] text-slate-500">
@@ -683,7 +679,7 @@ export default function GrowMyMoneyPage() {
                 onSaveGoal={handleSaveGoal}
                 monthlySurplus={summary.monthlySurplus}
                 trigger={
-                  <Button size="sm" className="h-8 text-xs font-bold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs">
+                  <Button size="sm" className="w-full sm:w-auto justify-center h-8 text-xs font-bold gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs">
                     <PlusCircle className="w-3.5 h-3.5" />
                     <span>Create Savings Goal</span>
                   </Button>
@@ -717,7 +713,7 @@ export default function GrowMyMoneyPage() {
                 {goals.map((goal) => {
                   const metrics = calculateGoalMetrics(goal, summary.monthlySurplus);
                   return (
-                    <Card key={goal.id} className="glass-card border border-slate-200/90 shadow-[0_10px_24px_-4px_rgba(0,0,0,0.08),0_4px_10px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_32px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
+                    <Card key={goal.id} className="glass-card border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all flex flex-col justify-between">
                       <CardHeader className="p-4 pb-2">
                         <div className="flex items-start justify-between gap-2">
                           <div>

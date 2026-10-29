@@ -7,26 +7,26 @@ import { logger } from '@/lib/logger';
 const RelevantChunkSchema = z.object({
   text: z.string(),
   metadata: z.object({
-    date: z.string(),
-    category: z.string().optional(),
-    amount: z.number().optional(),
-    fileName: z.string(),
-  }),
+    date: z.string().optional().nullable(),
+    category: z.string().optional().nullable(),
+    amount: z.number().optional().nullable(),
+    fileName: z.string().optional().nullable(),
+  }).optional().nullable(),
 });
 
 const PlannerSummarySchema = z.object({
-  monthlyIncome: z.number().optional(),
-  monthlyExpenses: z.number().optional(),
-  monthlySurplus: z.number().optional(),
-  plannedSavings: z.number().optional(),
-  acceptedTargets: z.record(z.string(), z.number()).optional(),
+  monthlyIncome: z.number().optional().nullable(),
+  monthlyExpenses: z.number().optional().nullable(),
+  monthlySurplus: z.number().optional().nullable(),
+  plannedSavings: z.number().optional().nullable(),
+  acceptedTargets: z.record(z.string(), z.number()).optional().nullable(),
   goals: z.array(z.object({
     name: z.string(),
     targetAmount: z.number(),
     currentSaved: z.number(),
     targetDate: z.string(),
-  })).optional(),
-}).optional();
+  })).optional().nullable(),
+}).optional().nullable();
 
 const ChatWithFinancialDataInputSchema = z.object({
   userQuery: z.string().min(1, 'Query cannot be empty'),
@@ -59,12 +59,13 @@ export async function chatWithFinancialData(input: ChatWithFinancialDataInput): 
     };
   }
 
-  const openai = new OpenAI({ apiKey });
+  // 25-second timeout to ensure the query always resolves gracefully
+  const openai = new OpenAI({ apiKey, timeout: 25000 });
 
   const contextStr = (input.relevantChunks || []).map(chunk => {
     let details = `[Source: ${chunk.metadata?.fileName || 'Document'}] [Date: ${chunk.metadata?.date || 'Unknown'}]`;
     if (chunk.metadata?.category) details += ` [Category: ${chunk.metadata.category}]`;
-    if (chunk.metadata?.amount !== undefined) details += ` [Amount: ₹${chunk.metadata.amount}]`;
+    if (chunk.metadata?.amount !== undefined && chunk.metadata?.amount !== null) details += ` [Amount: ₹${chunk.metadata.amount}]`;
     return `${details}\nContent: ${chunk.text}`;
   }).join('\n---\n');
 
@@ -73,14 +74,14 @@ export async function chatWithFinancialData(input: ChatWithFinancialDataInput): 
   if (input.plannerContext) {
     const p = input.plannerContext;
     plannerStr = `\n### GROW MY MONEY FINANCIAL POSITION:\n`;
-    if (p.monthlyIncome !== undefined) plannerStr += `- Monthly Income: ₹${p.monthlyIncome.toLocaleString('en-IN')}\n`;
-    if (p.monthlyExpenses !== undefined) plannerStr += `- Monthly Expenses: ₹${p.monthlyExpenses.toLocaleString('en-IN')}\n`;
-    if (p.monthlySurplus !== undefined) plannerStr += `- Estimated Monthly Surplus: ₹${p.monthlySurplus.toLocaleString('en-IN')}\n`;
-    if (p.plannedSavings !== undefined) plannerStr += `- Planned Monthly Savings: ₹${p.plannedSavings.toLocaleString('en-IN')}\n`;
+    if (p.monthlyIncome !== undefined && p.monthlyIncome !== null) plannerStr += `- Monthly Income: ₹${p.monthlyIncome.toLocaleString('en-IN')}\n`;
+    if (p.monthlyExpenses !== undefined && p.monthlyExpenses !== null) plannerStr += `- Monthly Expenses: ₹${p.monthlyExpenses.toLocaleString('en-IN')}\n`;
+    if (p.monthlySurplus !== undefined && p.monthlySurplus !== null) plannerStr += `- Estimated Monthly Surplus: ₹${p.monthlySurplus.toLocaleString('en-IN')}\n`;
+    if (p.plannedSavings !== undefined && p.plannedSavings !== null) plannerStr += `- Planned Monthly Savings: ₹${p.plannedSavings.toLocaleString('en-IN')}\n`;
     if (p.acceptedTargets && Object.keys(p.acceptedTargets).length > 0) {
       plannerStr += `- Accepted Category Reduction Targets:\n`;
       Object.entries(p.acceptedTargets).forEach(([cat, amt]) => {
-        plannerStr += `  * ${cat}: -₹${amt.toLocaleString('en-IN')}/mo (₹${(amt * 12).toLocaleString('en-IN')}/yr)\n`;
+        plannerStr += `  * ${cat}: -₹${Number(amt).toLocaleString('en-IN')}/mo (₹${(Number(amt) * 12).toLocaleString('en-IN')}/yr)\n`;
       });
     }
     if (p.goals && p.goals.length > 0) {

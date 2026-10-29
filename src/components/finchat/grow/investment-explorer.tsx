@@ -181,7 +181,7 @@ export function InvestmentExplorer({
             ].map((ladder) => (
               <div 
                 key={ladder.step}
-                className="p-3 rounded-2xl bg-white border border-slate-200/90 flex flex-col justify-between hover:border-slate-300 hover:shadow-[0_12px_22px_-3px_rgba(0,0,0,0.10)] hover:-translate-y-0.5 transition-all shadow-[0_6px_16px_-2px_rgba(0,0,0,0.06),0_2px_4px_rgba(0,0,0,0.04)]"
+                className="p-3 rounded-2xl bg-white border border-slate-200/90 flex flex-col justify-between hover:border-slate-300 hover:shadow-[0_18px_32px_-3px_rgba(0,0,0,0.30)] hover:-translate-y-0.5 transition-all shadow-[0_10px_22px_-2px_rgba(0,0,0,0.20),0_3px_6px_rgba(0,0,0,0.10)]"
               >
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
@@ -226,7 +226,7 @@ export function InvestmentExplorer({
             return (
               <div
                 key={item.id}
-                className="p-4 rounded-3xl bg-white border border-slate-200/90 hover:border-slate-300 shadow-[0_10px_24px_-4px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_18px_32px_-4px_rgba(0,0,0,0.12)] hover:-translate-y-0.5 transition-all space-y-3"
+                className="p-4 rounded-3xl bg-white border border-slate-200/90 hover:border-slate-300 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)] hover:shadow-[0_22px_40px_-4px_rgba(0,0,0,0.32)] hover:-translate-y-0.5 transition-all space-y-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5">
@@ -399,7 +399,7 @@ export function InvestmentExplorer({
             </div>
 
             {/* Right Results & Visual Chart */}
-            <div className="lg:col-span-7 flex flex-col justify-between space-y-4 bg-slate-50/70 p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-[0_10px_24px_-4px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.04)]">
+            <div className="lg:col-span-7 flex flex-col justify-between space-y-4 bg-slate-50/70 p-4 sm:p-5 rounded-3xl border border-slate-200/90 shadow-[0_14px_28px_-4px_rgba(0,0,0,0.22),0_5px_12px_-2px_rgba(0,0,0,0.14)]">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Projected Future Value ({durationYears} Year Horizon)
@@ -413,13 +413,13 @@ export function InvestmentExplorer({
               </div>
 
               <div className="grid grid-cols-2 gap-3 py-2 border-y border-slate-200/70">
-                <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-[0_4px_10px_-2px_rgba(0,0,0,0.05)]">
+                <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-[0_6px_14px_-2px_rgba(0,0,0,0.14)]">
                   <span className="text-[10px] font-medium text-slate-400 block">Total Principal Invested:</span>
                   <span className="text-base font-bold text-slate-900 mt-0.5 block">
                     {formatINR(scenario.totalInvested)}
                   </span>
                 </div>
-                <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-[0_4px_10px_-2px_rgba(0,0,0,0.05)]">
+                <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-[0_6px_14px_-2px_rgba(0,0,0,0.14)]">
                   <span className="text-[10px] font-medium text-emerald-600 font-bold block">Est. Wealth Created:</span>
                   <span className="text-base font-bold text-emerald-600 mt-0.5 block">
                     +{formatINR(scenario.estimatedWealthGain)}

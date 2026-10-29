@@ -142,7 +142,7 @@ export function AddExpenseDialog({ onExpenseAdded }: AddExpenseDialogProps = {})
   return (
     <Dialog open={open} onOpenChange={(val) => { setOpen(val); setValidationError(null); }}>
       <DialogTrigger asChild>
-        <Button className="h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-blue-600/20 transition-all gap-1.5 shrink-0">
+        <Button className="w-full xs:w-auto justify-center h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs hover:shadow-md hover:shadow-blue-600/20 transition-all gap-1.5 shrink-0">
           <PlusCircle className="w-3.5 h-3.5 text-blue-200" />
           <span>Add Expense</span>
         </Button>

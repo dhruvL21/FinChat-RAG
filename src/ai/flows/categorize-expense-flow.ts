@@ -40,7 +40,8 @@ export async function categorizeExpenses(input: CategorizeExpenseInput): Promise
     };
   }
 
-  const openai = new OpenAI({ apiKey });
+  // 10-second timeout to ensure categorization never freezes the upload UI
+  const openai = new OpenAI({ apiKey, timeout: 10000 });
 
   try {
     const response = await openai.chat.completions.create({
@@ -81,7 +82,7 @@ If a transaction does not fit any specific category, assign it to 'Miscellaneous
       results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
     };
   } catch (error) {
-    logger.error('AIFlow:Categorize', 'OpenAI categorization failed, applying fallback categories', error);
+    logger.error('AIFlow:Categorize', 'OpenAI categorization failed or timed out, applying fallback categories', error);
     return {
       results: input.descriptions.map(desc => ({ description: desc, category: 'Miscellaneous' }))
     };

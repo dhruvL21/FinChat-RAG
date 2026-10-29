@@ -42,7 +42,8 @@ export async function mapCSVSchema(input: MapCSVSchemaInput): Promise<CSVSchemaM
     return defaultFallback;
   }
 
-  const openai = new OpenAI({ apiKey });
+  // Set 10-second timeout to prevent upload hanging
+  const openai = new OpenAI({ apiKey, timeout: 10000 });
 
   const promptContent = `Analyze the following CSV sample lines from the file "${input.filename || 'uploaded_statement.csv'}":
 
@@ -101,7 +102,7 @@ Return JSON in this format:
 
     return defaultFallback;
   } catch (error) {
-    logger.error('AIFlow:CSVMap', 'OpenAI schema mapping error, applying default fallback', error);
+    logger.error('AIFlow:CSVMap', 'OpenAI schema mapping error or timeout, applying default fallback', error);
     return defaultFallback;
   }
 }

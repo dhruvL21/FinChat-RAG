@@ -63,7 +63,7 @@ export function DatePickerWithRange({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 z-[100]" align="end">
+        <PopoverContent className="w-auto p-0 z-[100] rounded-2xl border border-slate-200/90 shadow-[0_20px_45px_-4px_rgba(0,0,0,0.25)] bg-white overflow-hidden max-w-[96vw] sm:max-w-none" align="end">
           <Calendar
             initialFocus
             mode="range"
@@ -72,11 +72,11 @@ export function DatePickerWithRange({
             onSelect={handleSelect}
             numberOfMonths={isMobile ? 1 : 2}
           />
-          <div className="p-2.5 border-t flex items-center justify-between gap-2 bg-muted/20">
+          <div className="p-2.5 border-t border-slate-100 flex items-center justify-between gap-2 bg-slate-50/70">
             <Button 
               variant="ghost" 
               size="sm" 
-              className="text-xs h-7 text-muted-foreground hover:text-foreground"
+              className="text-xs h-8 text-slate-600 hover:text-slate-900 rounded-xl px-3"
               onClick={() => handleSelect(undefined)}
             >
               All Time
@@ -84,7 +84,7 @@ export function DatePickerWithRange({
             <Button 
               variant="secondary" 
               size="sm" 
-              className="text-xs h-7 font-bold text-primary"
+              className="text-xs h-8 font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/60 rounded-xl px-3"
               onClick={() => handleSelect({ from: subMonths(new Date(), 1), to: new Date() })}
             >
               Last 30 Days

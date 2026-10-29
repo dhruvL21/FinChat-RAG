@@ -28,29 +28,29 @@ export type ExpenseInput = z.infer<typeof ExpenseInputSchema>;
 export const RelevantChunkValidationSchema = z.object({
   text: z.string().trim().min(1, 'Chunk text cannot be empty'),
   metadata: z.object({
-    date: z.string(),
-    category: z.string().optional(),
-    amount: z.number().optional(),
-    fileName: z.string()
-  })
+    date: z.string().optional().nullable(),
+    category: z.string().optional().nullable(),
+    amount: z.number().optional().nullable(),
+    fileName: z.string().optional().nullable()
+  }).optional().nullable()
 });
 
 export const ChatQueryInputSchema = z.object({
   userQuery: z.string().trim().min(1, 'Query cannot be empty').max(1000, 'Query cannot exceed 1,000 characters'),
   relevantChunks: z.array(RelevantChunkValidationSchema).max(50, 'Cannot process more than 50 context chunks'),
   plannerContext: z.object({
-    monthlyIncome: z.number().optional(),
-    monthlyExpenses: z.number().optional(),
-    monthlySurplus: z.number().optional(),
-    plannedSavings: z.number().optional(),
-    acceptedTargets: z.record(z.string(), z.number()).optional(),
+    monthlyIncome: z.number().optional().nullable(),
+    monthlyExpenses: z.number().optional().nullable(),
+    monthlySurplus: z.number().optional().nullable(),
+    plannedSavings: z.number().optional().nullable(),
+    acceptedTargets: z.record(z.string(), z.number()).optional().nullable(),
     goals: z.array(z.object({
       name: z.string(),
       targetAmount: z.number(),
       currentSaved: z.number(),
       targetDate: z.string(),
-    })).optional(),
-  }).optional()
+    })).optional().nullable(),
+  }).optional().nullable()
 });
 
 export type ChatQueryInput = z.infer<typeof ChatQueryInputSchema>;
@@ -125,3 +125,16 @@ export const InvestmentCalculatorInputSchema = z.object({
 
 export type InvestmentCalculatorInput = z.infer<typeof InvestmentCalculatorInputSchema>;
 
+/**
+ * Zod Schema for Document Parsing Results
+ */
+export const DocumentParsedContentSchema = z.object({
+  documentId: z.string().min(1),
+  filename: z.string().min(1),
+  fileType: z.enum(['CSV', 'PDF']),
+  chunksCount: z.number().int().nonnegative(),
+  isEncrypted: z.boolean().optional(),
+  totalAmount: z.number().optional()
+});
+
+export type DocumentParsedContent = z.infer<typeof DocumentParsedContentSchema>;
