@@ -15,6 +15,7 @@ import {
   Trash2, 
   Zap,
   Lock,
+  KeyRound,
   ShieldCheck,
   MessageSquare,
   RefreshCw
@@ -215,19 +216,20 @@ export default function UploadPage() {
         });
       }
 
-      // Index detected transaction rows
+      // Index detected transaction rows (normalized with standard category & CSV structure)
       if (result.detectedTransactions && result.detectedTransactions.length > 0) {
-        for (let i = 0; i < Math.min(result.detectedTransactions.length, 50); i++) {
+        for (let i = 0; i < Math.min(result.detectedTransactions.length, 300); i++) {
           const tx = result.detectedTransactions[i];
           const chunkId = Math.random().toString(36).substring(7);
+          const finalCategory = tx.category || (tx.type === 'credit' ? 'Income' : 'Miscellaneous');
           chunksToWrite.push({
             id: chunkId,
             documentId: pendingPdfData.docId,
-            chunkText: `Transaction: ${tx.date} | ${tx.description} | ₹${tx.amount} (${tx.type})`,
+            chunkText: `${tx.date},${tx.description},${tx.amount},${finalCategory}`,
             chunkOrder: result.chunks.length + i,
             transactionDate: tx.date,
             amount: tx.amount,
-            category: tx.type === 'credit' ? 'Income' : 'Miscellaneous',
+            category: finalCategory,
             embeddingVector: [0]
           });
         }
@@ -350,17 +352,18 @@ export default function UploadPage() {
         }
 
         if (result.detectedTransactions && result.detectedTransactions.length > 0) {
-          for (let i = 0; i < Math.min(result.detectedTransactions.length, 50); i++) {
+          for (let i = 0; i < Math.min(result.detectedTransactions.length, 300); i++) {
             const tx = result.detectedTransactions[i];
             const chunkId = Math.random().toString(36).substring(7);
+            const finalCategory = tx.category || (tx.type === 'credit' ? 'Income' : 'Miscellaneous');
             chunksToWrite.push({
               id: chunkId,
               documentId: docId,
-              chunkText: `Transaction: ${tx.date} | ${tx.description} | ₹${tx.amount} (${tx.type})`,
+              chunkText: `${tx.date},${tx.description},${tx.amount},${finalCategory}`,
               chunkOrder: result.chunks.length + i,
               transactionDate: tx.date,
               amount: tx.amount,
-              category: tx.type === 'credit' ? 'Income' : 'Miscellaneous',
+              category: finalCategory,
               embeddingVector: [0]
             });
           }
@@ -733,10 +736,35 @@ export default function UploadPage() {
                       </span>
                     )}
                     {file.status === 'locked' && (
-                      <span className="flex items-center gap-1.5 text-[10px] md:text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full whitespace-nowrap">
-                        <Lock className="w-3 h-3 text-amber-600" />
-                        Locked (Password Needed)
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1.5 text-[10px] md:text-xs text-amber-700 font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                          <Lock className="w-3 h-3 text-amber-600" />
+                          Locked
+                        </span>
+                        <Button 
+                          size="sm" 
+                          variant="default" 
+                          className="text-[10px] md:text-xs font-bold gap-1 py-1 h-7 bg-amber-600 hover:bg-amber-700 text-white shadow-xs rounded-full px-2.5"
+                          onClick={() => {
+                            if (pendingPdfData && pendingPdfData.docId === file.id) {
+                              setPdfPasswordError(null);
+                              setIsUnlockDialogOpen(true);
+                            } else {
+                              const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                              if (fileInput) {
+                                toast({
+                                  title: "Select File to Unlock",
+                                  description: `Please select "${file.filename}" to enter its password and index.`
+                                });
+                                fileInput.click();
+                              }
+                            }
+                          }}
+                        >
+                          <KeyRound className="w-3 h-3" />
+                          Unlock
+                        </Button>
+                      </div>
                     )}
                     {file.status === 'ready' && (
                       <div className="flex items-center gap-2">

@@ -299,8 +299,8 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Action Controls: Date Range, Add Expense */}
-          <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          {/* Action Controls: Date Range, Add Expense in one line */}
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <DatePickerWithRange onRangeChange={setDateRange} />
             <AddExpenseDialog onExpenseAdded={loadData} />
           </div>

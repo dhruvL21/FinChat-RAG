@@ -1,16 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import 'pdfjs-dist/legacy/build/pdf.worker.mjs';
-import path from 'path';
-import { pathToFileURL } from 'url';
 import { logger } from '@/lib/logger';
-
-// Configure workerSrc explicitly to prevent fake worker resolution failure in Next.js/Turbopack
-try {
-  const workerPath = path.resolve(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
-} catch (e) {
-  // Fallback to bundled worker
-}
 
 export interface ExtractedChunk {
   pageNumber: number;
@@ -33,13 +23,96 @@ export interface ParsePdfResult {
     date: string;
     description: string;
     amount: number;
+    category?: string;
     type: 'debit' | 'credit';
   }>;
 }
 
 /**
- * Parses and decrypts a PDF buffer using pdfjs-dist.
- * Correctly identifies password-protected PDFs and verifies supplied passwords.
+ * Normalizes common Indian bank statement date formats (DD/MM/YYYY, DD-MMM-YYYY, etc.)
+ * into standard YYYY-MM-DD ISO format for seamless indexing and chart visualization.
+ */
+export function normalizeToISODate(rawDate: string): string {
+  try {
+    const trimmed = rawDate.trim();
+    // 1. YYYY-MM-DD or YYYY/MM/DD
+    const isoMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (isoMatch) {
+      const [, y, m, d] = isoMatch;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    // 2. DD-MM-YYYY or DD/MM/YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+    if (dmyMatch) {
+      let [, d, m, y] = dmyMatch;
+      if (y.length === 2) y = `20${y}`;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    // 3. DD-MMM-YYYY or DD MMM YYYY (e.g. 15-Apr-2026, 05 Oct 2026)
+    const monthNames: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+    const namedMatch = trimmed.match(/^(\d{1,2})[-/\s]+([a-z]{3})[a-z]*[-/\s]+(\d{2,4})$/i);
+    if (namedMatch) {
+      let [, d, mStr, y] = namedMatch;
+      const m = monthNames[mStr.toLowerCase()];
+      if (m) {
+        if (y.length === 2) y = `20${y}`;
+        return `${y}-${m}-${d.padStart(2, '0')}`;
+      }
+    }
+
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch {}
+  return new Date().toISOString().split('T')[0];
+}
+
+/**
+ * Categorizes bank transaction descriptions into standard Indian spending categories.
+ */
+function inferTransactionCategory(description: string, isCredit: boolean): string {
+  if (isCredit) return 'Income';
+  const desc = description.toLowerCase();
+
+  if (/swiggy|zomato|eats|food|restaurant|cafe|bakery|supermarket|grocery|groceries|blinkit|zepto|instamart|dmart|bigbasket/i.test(desc)) {
+    return 'Food';
+  }
+  if (/uber|ola|rapido|metro|irctc|railway|indigo|air india|vistara|flight|fuel|petrol|diesel|hpcl|bpcl|ioc/i.test(desc)) {
+    return 'Travel';
+  }
+  if (/amazon|flipkart|myntra|ajio|zara|h&m|shoppers|croma|reliance|retail|store|mall|shopping/i.test(desc)) {
+    return 'Shopping';
+  }
+  if (/bescom|electricity|power|airtel|jio|vi|broadband|wifi|water|gas|utility|utilities|bill/i.test(desc)) {
+    return 'Utilities';
+  }
+  if (/rent|landlord|housing|society|maintenance|nobroker/i.test(desc)) {
+    return 'Rent';
+  }
+  if (/emi|loan|bajaj finance|hdfc bank loan|icici bank loan|axis loan|kotak loan/i.test(desc)) {
+    return 'EMI';
+  }
+  if (/apollo|pharmacy|medplus|netmeds|1mg|hospital|clinic|doctor|health|dental|lab/i.test(desc)) {
+    return 'Healthcare';
+  }
+  if (/zerodha|groww|upstox|mutual fund|sip|uti|sbi mf|nippon|investment|stocks/i.test(desc)) {
+    return 'Investment';
+  }
+  if (/school|college|university|coursera|udemy|fees|education|tuition/i.test(desc)) {
+    return 'Education';
+  }
+  return 'Miscellaneous';
+}
+
+/**
+ * Parses and decrypts a PDF buffer using in-process pdfjs-dist.
+ * Accurately detects password requirements and authenticates encrypted statements.
  */
 export async function parsePdfBuffer(
   buffer: Uint8Array,
@@ -58,27 +131,36 @@ export async function parsePdfBuffer(
       useSystemFonts: true
     });
 
-    // Attach onPassword callback to detect password requirements
-    loadingTask.onPassword = (updatePassword: (password: string) => void, reason: number) => {
+    // Guard onPassword: reject with Error immediately so pdf.js terminates promptly without looping
+    loadingTask.onPassword = (updatePassword: (password: string | Error) => void, reason: number) => {
       if (reason === pdfjsLib.PasswordResponses.NEED_PASSWORD) {
         needPassword = true;
       } else if (reason === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD) {
         wrongPassword = true;
       }
-      // If we don't supply a valid new password immediately, cancel the prompt
-      updatePassword('');
+      updatePassword(new Error(reason === 2 ? 'Incorrect password' : 'Password required'));
     };
 
     let pdfDoc;
     try {
       pdfDoc = await loadingTask.promise;
     } catch (err: any) {
-      if (
+      const isPasswordIssue =
         needPassword ||
+        wrongPassword ||
         err?.name === 'PasswordException' ||
-        err?.message?.toLowerCase().includes('password')
-      ) {
-        if (password && (wrongPassword || err?.code === 2)) {
+        err?.code === 1 ||
+        err?.code === 2 ||
+        err?.message?.toLowerCase().includes('password');
+
+      if (isPasswordIssue) {
+        const isWrong =
+          wrongPassword ||
+          err?.code === 2 ||
+          err?.message?.toLowerCase().includes('incorrect') ||
+          Boolean(password && password.trim().length > 0);
+
+        if (isWrong) {
           return {
             success: false,
             requiresPassword: true,
@@ -86,6 +168,7 @@ export async function parsePdfBuffer(
             error: 'Incorrect password for this bank statement PDF. Please check your credentials and try again.'
           };
         }
+
         return {
           success: false,
           requiresPassword: true,
@@ -102,6 +185,7 @@ export async function parsePdfBuffer(
       date: string;
       description: string;
       amount: number;
+      category?: string;
       type: 'debit' | 'credit';
     }> = [];
 
@@ -112,7 +196,6 @@ export async function parsePdfBuffer(
       const page = await pdfDoc.getPage(pageNum);
       const textContent = await page.getTextContent();
       
-      // Combine text items preserving whitespace and line structure
       const items = textContent.items as Array<{ str: string; hasEOL?: boolean }>;
       const lines: string[] = [];
       let currentLine = '';
@@ -132,7 +215,7 @@ export async function parsePdfBuffer(
       totalTextLength += fullPageText.length;
 
       // Scan page text for Indian bank statement transaction patterns
-      const dateRegex = /\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/i;
+      const dateRegex = /\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/i;
 
       lines.forEach((line) => {
         const dateMatch = line.match(dateRegex);
@@ -142,19 +225,24 @@ export async function parsePdfBuffer(
             const rawAmt = numbers[numbers.length - 1].replace(/,/g, '');
             const parsedAmt = parseFloat(rawAmt);
             if (!isNaN(parsedAmt) && parsedAmt > 0) {
-              const isDebit = /dr|debit|withdraw|transfer to|pos|upi/i.test(line);
+              const isCredit = /cr|credit|deposit|salary|refund/i.test(line) && !/debit|dr|withdraw/i.test(line);
+              const cleanDesc = line.replace(dateRegex, '').replace(/[0-9,]+\.[0-9]{2}/g, '').replace(/[-|:]+/g, ' ').trim();
+              const category = inferTransactionCategory(cleanDesc || line, isCredit);
+              const isoDate = normalizeToISODate(dateMatch[1]);
+
               detectedTransactions.push({
-                date: dateMatch[1],
-                description: line.substring(0, 80).trim(),
+                date: isoDate,
+                description: cleanDesc.substring(0, 80) || 'Bank Statement Transaction',
                 amount: parsedAmt,
-                type: isDebit ? 'debit' : 'credit'
+                category,
+                type: isCredit ? 'credit' : 'debit'
               });
             }
           }
         }
       });
 
-      // Break page into clean chunks (~400-800 characters)
+      // Break page into clean chunks (~400-800 characters) for RAG context
       const maxChunkSize = 750;
       let pageOffset = 0;
       while (pageOffset < fullPageText.length) {

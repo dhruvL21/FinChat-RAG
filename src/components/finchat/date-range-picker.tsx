@@ -38,28 +38,25 @@ export function DatePickerWithRange({
   };
 
   return (
-    <div className={cn("grid gap-2", className)}>
+    <div className={cn("inline-block shrink-0", className)}>
       <Popover>
         <PopoverTrigger asChild>
           <Button
             id="date"
-            variant={"outline"}
-            className={cn(
-              "w-fit min-w-[130px] md:min-w-[210px] justify-start text-left font-medium bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-2xs h-9 text-xs rounded-xl",
-              !date && "text-slate-600"
-            )}
+            variant="outline"
+            className="w-auto justify-start text-left font-semibold text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300 transition-all shadow-2xs h-9 px-3 text-xs rounded-xl whitespace-nowrap"
           >
-            <CalendarIcon className="mr-2 h-3.5 w-3.5 text-slate-500 shrink-0" />
+            <CalendarIcon className="mr-2 h-3.5 w-3.5 text-slate-600 shrink-0" />
             {mounted && date?.from ? (
               date.to ? (
-                <span className="truncate text-xs">
+                <span className="truncate text-xs font-semibold text-slate-800">
                   {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
                 </span>
               ) : (
-                <span className="text-xs">{format(date.from, "LLL dd, y")}</span>
+                <span className="text-xs font-semibold text-slate-800">{format(date.from, "LLL dd, y")}</span>
               )
             ) : (
-              <span className="text-xs font-medium">All Time (Filter)</span>
+              <span className="text-xs font-semibold text-slate-800">All Time (Filter)</span>
             )}
           </Button>
         </PopoverTrigger>
